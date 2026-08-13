@@ -1,6 +1,6 @@
 import "../../css/Login.css";
 import { useState } from "react";
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
@@ -34,20 +34,43 @@ function Login() {
       }
 
       if (data.error) {
-       setError("Impossible de contacter le serveur.");
+        setError("Impossible de contacter le serveur.");
         return;
       }
+
+      const status = String(data.statut || data.status || '').toLowerCase();
+      const suspended = status === 'suspendu' || status === 'suspended' || data.suspended === true;
+
+      if (suspended) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("nom");
+        localStorage.removeItem("email");
+        localStorage.removeItem("role");
+        localStorage.removeItem('avatar');
+        setError("Ce compte est suspendu. Vous ne pouvez pas vous connecter.");
+        setMsg('');
+        return;
+      }
+
       if (data.token) {
-                      localStorage.setItem("token", data.token);
-                      localStorage.setItem("nom", data.nom);
-                      localStorage.setItem("email", data.email);
-                      localStorage.setItem("role", data.role);
-                      localStorage.setItem('avatar',data.avatar); 
-navigate('/espConnecter'); 
-}
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("nom", data.nom);
+        localStorage.setItem("prenom", data.prenom);
+        localStorage.setItem("email", data.email);
+        localStorage.setItem("role", data.role);
+        localStorage.setItem('avatar', data.avatar);
 
+        const role = String(data.role || '').toLowerCase();
+        if (role.includes('admin')) {
+          navigate('/admin/boutiques');
+        } else {
+          navigate('/espConnecter');
+        }
+        return;
+      }
 
-      setMsg(data.message) ; 
+      setError(data.message || "Identifiants incorrects.");
+      setMsg('');
       
     } catch (error) {
       console.error('An error occurred during login.', error);

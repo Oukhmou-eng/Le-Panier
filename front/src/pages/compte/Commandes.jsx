@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { getCommandesUtilisateur } from '../../services/commandeService';
 import '../../css/Commandes.css';
 
-const USER_ID = 1;
+// fetch current user commandes from token-authenticated endpoint
 
 const filters = [
   { key: 'toutes', label: 'Toutes' },
@@ -57,7 +57,7 @@ function Commandes() {
       try {
         setLoading(true);
         setError('');
-        setCommandes(await getCommandesUtilisateur(USER_ID));
+        setCommandes(await getCommandesUtilisateur());
       } catch (requestError) {
         setError(requestError.message || 'Impossible de charger vos commandes.');
         setCommandes([]);

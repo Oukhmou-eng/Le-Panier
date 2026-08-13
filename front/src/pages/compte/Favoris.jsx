@@ -1,4 +1,5 @@
 import '../../css/Favoris.css';
+import '../../css/Home.css';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -75,6 +76,24 @@ function Favoris() {
     }
   };
 
+  const normaliserProduit = (produit) => {
+    const prix = Number(produit.prix ?? 0);
+    const prixPromo = produit.prix_promo === null || produit.prix_promo === undefined
+      ? null
+      : Number(produit.prix_promo);
+
+    return {
+      ...produit,
+      prix,
+      prixPromo,
+      reductionPourcentage: produit.type_reduction === 'pourcentage'
+        ? Number(produit.valeur_reduction ?? 0)
+        : prixPromo !== null && prix > 0
+          ? Math.round(((prix - prixPromo) / prix) * 100)
+          : 0,
+    };
+  };
+
   return (
     <main className='content-area'>
       <section className='cview active' id='page-favoris'>
@@ -93,14 +112,31 @@ function Favoris() {
         <div className='grid' id='homeGrid'>
           {produits.map((produit) => {
             const estFavori = favoris.has(produit.id_produit);
+            const produitNormalise = normaliserProduit(produit);
+            const estEnSolde = produitNormalise.prixPromo !== null
+              && produitNormalise.prixPromo < produitNormalise.prix;
             return (
               <div key={produit.id_produit} className='card' onClick={() => navigate(`/produit/${produit.id_produit}`)}>
                 <div className='thumb'>
+                  {estEnSolde && produitNormalise.reductionPourcentage > 0 && (
+                    <span className='home-solde-badge'>-{produitNormalise.reductionPourcentage}%</span>
+                  )}
                   {produit.type?.toLowerCase().startsWith('video') ? (
-                    <video src={produit.url} muted loop playsInline />
+                    <video
+                      src={produit.url}
+                      muted
+                      loop
+                      playsInline
+                      onMouseOver={(event) => event.target.play()}
+                      onMouseOut={(event) => {
+                        event.target.pause();
+                        event.target.currentTime = 0;
+                      }}
+                    />
                   ) : (
                     <img src={produit.url} alt={produit.nom} />
                   )}
+                  {produit.type?.toLowerCase().startsWith('video') && <span className='play'>▶</span>}
                 </div>
                 <div className='card-body'>
                   <button
@@ -114,7 +150,14 @@ function Favoris() {
                   />
                   <div className='name'>{produit.nom}</div>
                   <div className='shop'>{produit.boutique_nom}</div>
-                  <div className='price'>{produit.prix} MAD</div>
+                  {estEnSolde ? (
+                    <div className='home-solde-prices'>
+                      <span className='home-price-old'>{produitNormalise.prix} MAD</span>
+                      <span className='price'>{produitNormalise.prixPromo} MAD</span>
+                    </div>
+                  ) : (
+                    <div className='price'>{produitNormalise.prix} MAD</div>
+                  )}
                 </div>
               </div>
             );

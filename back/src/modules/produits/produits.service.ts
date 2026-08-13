@@ -25,9 +25,10 @@ export class ProduitsService {
       );
       if (!boutiques.length) throw new BadRequestException('Créez d’abord une boutique active avant de publier un produit.');
 
+      const selectedCategory = String(dto.categorie).trim();
       const [categories] = await connection.execute<(RowDataPacket & { id_categorie: number })[]>(
-        'SELECT id_categorie FROM categories WHERE LOWER(nom) = LOWER(?) LIMIT 1',
-        [dto.categorie.trim()],
+        'SELECT id_categorie FROM categories WHERE LOWER(nom) = LOWER(?) OR id_categorie = ? LIMIT 1',
+        [selectedCategory, selectedCategory],
       );
       if (!categories.length) throw new BadRequestException('La catégorie sélectionnée est introuvable.');
 
@@ -112,12 +113,22 @@ export class ProduitsService {
           p.id_boutique,
           p.id_categorie,
           c.nom AS categorie_nom,
-          b.nom AS boutique_nom
+          b.nom AS boutique_nom,
+          s.type_reduction,
+          s.valeur_reduction,
+          s.prix_promo AS prix_promo,
+          s.date_debut AS date_debut,
+          s.date_fin AS date_fin
         FROM produits p
         INNER JOIN boutiques b
           ON b.id_boutique = p.id_boutique
         LEFT JOIN categories c
           ON c.id_categorie = p.id_categorie
+        LEFT JOIN soldes s
+          ON s.id_produit = p.id_produit
+          AND s.statut = 'active'
+          AND s.date_debut <= NOW()
+          AND s.date_fin >= NOW()
         WHERE p.id_produit = ?
         LIMIT 1
         `,
@@ -192,9 +203,10 @@ export class ProduitsService {
         params.push(dto.statut);
       }
       if (dto.categorie !== undefined) {
+        const selectedCategory = String(dto.categorie).trim();
         const [categories] = await connection.execute<(RowDataPacket & { id_categorie: number })[]>(
-          'SELECT id_categorie FROM categories WHERE LOWER(nom) = LOWER(?) LIMIT 1',
-          [dto.categorie.trim()],
+          'SELECT id_categorie FROM categories WHERE LOWER(nom) = LOWER(?) OR id_categorie = ? LIMIT 1',
+          [selectedCategory, selectedCategory],
         );
         if (!categories.length) {
           throw new BadRequestException('La catégorie sélectionnée est introuvable.');
@@ -254,6 +266,23 @@ export class ProduitsService {
 
 
 
+
+  async signaler(id: number, motif: string, description: string, idUser: number) {
+    try {
+      await this.db.query(
+        `
+        INSERT INTO signalements (id_user, type_cible, id_cible, motif, description, date_creation, statut)
+        VALUES (?, 'produit', ?, ?, ?, NOW(), 'en_cours')
+        `,
+        [idUser, id, motif, description],
+      );
+
+      return { success: true, message: 'Signalement envoyé avec succès.' };
+    } catch (error) {
+      console.error('Erreur signaler produit:', error);
+      return { success: false, message: "Une erreur est survenue lors de l'envoi du signalement." };
+    }
+  }
 
 async getAvis(id: number) {
   try {

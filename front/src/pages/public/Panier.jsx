@@ -1,7 +1,7 @@
 import "../../css/Panier.css";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getPanier, getPanierEnregistres, removeFromPanier, restoreFromSaved, saveForLater, updatePanierQuantity } from "../../services/panierService";
+import { getPanier, getPanierEnregistres, removeFromPanier, restoreFromSaved, saveForLater, updatePanierQuantity, placeOrder } from "../../services/panierService";
 
 /* =========================================================
    Structure attendue pour chaque article de panier, renvoyée
@@ -34,6 +34,7 @@ function Panier() {
   const [checkoutMessage, setCheckoutMessage] = useState("");
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [checkoutStep, setCheckoutStep] = useState(1);
+  const [isPlacing, setIsPlacing] = useState(false);
 
   /* =========================================================
      Chargement des données au montage — c'est ce qui rend la
@@ -41,19 +42,36 @@ function Panier() {
      vient de l'API.
      ========================================================= */
 
-  const mapCartItem = (item) => ({
-    id: item.id,
-    shopId: item.id_boutique,
-    shopName: item.boutique_nom,
-    shopLogo: item.boutique_logo_url ?? null,
-    productId: item.id_produit,
-    name: item.nom,
-    variant: item.variante ?? "",
-    price: Number(item.prix),
-    qty: Number(item.quantite),
-    image: item.image_url,
-    stock: Number(item.stock),
-  });
+  const mapCartItem = (item) => {
+    const price = Number(item.prix);
+    const salePrice = item.prix_promo === null || item.prix_promo === undefined ? null : Number(item.prix_promo);
+    const isOnSale = salePrice !== null && salePrice < price;
+    const discountPercent = isOnSale
+      ? item.type_reduction === 'pourcentage'
+        ? Number(item.valeur_reduction ?? 0)
+        : Math.round(((price - salePrice) / price) * 100)
+      : 0;
+
+    return {
+      id: item.id,
+      shopId: item.id_boutique,
+      shopName: item.boutique_nom,
+      shopLogo: item.boutique_logo_url ?? null,
+      productId: item.id_produit,
+      name: item.nom,
+      variant: item.variante ?? "",
+      price,
+      salePrice,
+      saleType: item.type_reduction,
+      saleDiscountPercent: discountPercent,
+      saleEnd: item.date_fin,
+      isOnSale,
+      displayPrice: isOnSale ? salePrice : price,
+      qty: Number(item.quantite),
+      image: item.image_url,
+      stock: Number(item.stock),
+    };
+  };
 
   const fetchCart = async () => {
     setIsLoading(true);
@@ -121,7 +139,56 @@ function Panier() {
 
   const handleGoToShipping = () => { setCheckoutMessage(""); setCheckoutStep(1); setCheckoutOpen(true); };
 
+  const validateDelivery = () => {
+    const required = [delivery.prenom, delivery.nom, delivery.telephone, delivery.adresse, delivery.ville, delivery.codePostal];
+    if (required.some((value) => !value.trim())) {
+      setCheckoutMessage("Complétez votre adresse de livraison avant de continuer.");
+      return false;
+    }
+    if (!/^[+0-9 ()-]{8,25}$/.test(delivery.telephone.trim()) || !/^[A-Za-z0-9 -]{3,20}$/.test(delivery.codePostal.trim())) {
+      setCheckoutMessage("Vérifiez le téléphone et le code postal.");
+      return false;
+    }
+    return true;
+  };
+
+  const isValidCardNumber = (value) => {
+    const digits = value.replace(/[\s-]/g, "");
+    if (!/^\d{13,19}$/.test(digits)) return false;
+    return digits.split("").reverse().reduce((sum, digit, index) => {
+      let current = Number(digit);
+      if (index % 2 === 1) current = current > 4 ? current * 2 - 9 : current * 2;
+      return sum + current;
+    }, 0) % 10 === 0;
+  };
+
+  const validatePayment = () => {
+    if (paymentMethod !== "card") return true;
+    if ([card.name, card.number, card.expiry, card.cvc].some((value) => !value.trim()) || !isValidCardNumber(card.number)) {
+      setCheckoutMessage("Vérifiez les informations de votre carte.");
+      return false;
+    }
+    if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(card.expiry) || !/^\d{3,4}$/.test(card.cvc)) {
+      setCheckoutMessage("Vérifiez la date d’expiration et le CVC.");
+      return false;
+    }
+    const [month, year] = card.expiry.split("/").map(Number);
+    if (new Date(2000 + year, month, 0) < new Date(new Date().getFullYear(), new Date().getMonth(), 1)) {
+      setCheckoutMessage("Cette carte est expirée.");
+      return false;
+    }
+    return true;
+  };
+
+  const handleNextStep = () => {
+    if (validateDelivery()) {
+      setCheckoutMessage("");
+      setCheckoutStep(2);
+    }
+  };
+
   const handlePlaceOrder = () => {
+    if (!validateDelivery() || !validatePayment()) return;
     const required = [delivery.prenom, delivery.nom, delivery.telephone, delivery.adresse, delivery.ville, delivery.codePostal];
     if (required.some((value) => !value.trim())) {
       setCheckoutMessage("Complétez votre adresse de livraison avant de confirmer.");
@@ -133,7 +200,43 @@ function Panier() {
       document.getElementById("checkout-payment")?.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
     }
-    setCheckoutMessage("Votre commande est prête à être confirmée. L’enregistrement côté paiement sera raccordé à l’étape suivante.");
+
+    setCheckoutMessage("Traitement de la commande…");
+    setIsPlacing(true);
+    (async () => {
+      try {
+        const adressePayload = {
+          ligne1: delivery.adresse,
+          ville: delivery.ville,
+          code_postal: delivery.codePostal,
+          tele: delivery.telephone,
+          libelle: `${delivery.prenom} ${delivery.nom}`,
+        };
+
+        const paiementPayload = paymentMethod === 'card' ? {
+          methode: 'carte',
+          fournisseur: 'simulation',
+          carte: { nom: card.name, numero: card.number, expiration: card.expiry, cvc: card.cvc }
+        } : { methode: 'cod', fournisseur: 'livraison' };
+
+        const payload = {
+          adresse: adressePayload,
+          paiement: paiementPayload,
+          note,
+          shippingMethod,
+        };
+
+        const res = await placeOrder(payload);
+        setCheckoutMessage('Commande passée avec succès. Référence: ' + (res.reference_transaction ?? res.id_commande));
+        setCheckoutOpen(false);
+        await fetchCart();
+        navigate('/mes-commandes');
+      } catch (error) {
+        setCheckoutMessage(error.message || 'Erreur lors du traitement de la commande.');
+      } finally {
+        setIsPlacing(false);
+      }
+    })();
   };
   const groupedByShop = useMemo(() => {
     const groups = {};
@@ -152,7 +255,7 @@ function Panier() {
   }, [cartItems]);
 
   const totalItems = cartItems.reduce((sum, item) => sum + item.qty, 0);
-  const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.qty, 0);
+  const subtotal = cartItems.reduce((sum, item) => sum + item.displayPrice * item.qty, 0);
   const discount = promoApplied?.discount ?? 0;
   const shippingFee = subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_FEE;
   const total = Math.max(0, subtotal - discount + shippingFee);
@@ -302,8 +405,22 @@ function Panier() {
                             <div className="item-variant">{item.variant}</div>
                           </div>
                           <div className="item-price">
-                            {item.price} DH<span className="unit">/ unité</span>
+                            {item.isOnSale ? (
+                              <>
+                                <span className="item-price-sale">{item.displayPrice} DH</span>
+                                <span className="item-price-original">{item.price} DH</span>
+                              </>
+                            ) : (
+                              <>{item.displayPrice} DH</>
+                            )}
+                            <span className="unit">/ unité</span>
                           </div>
+                        {item.isOnSale && (
+                          <div className="sale-badge">
+                            En solde{item.saleDiscountPercent > 0 ? ` -${item.saleDiscountPercent}%` : ''}
+                            {item.saleEnd ? ` • jusqu'au ${new Date(item.saleEnd).toLocaleDateString('fr-FR')}` : ''}
+                          </div>
+                        )}
                         </div>
 
                         <div className="item-bottom">
@@ -472,7 +589,14 @@ function Panier() {
       {checkoutOpen && <div className="checkout-overlay"><div className="checkout-card">
         <button className="checkout-close" onClick={() => setCheckoutOpen(false)}>×</button>
         <div className="checkout-progress"><span className="current">1</span><i></i><span className={checkoutStep === 2 ? "current" : ""}>2</span></div>
-        {checkoutStep === 1 ? <><div className="checkout-card-head"><p>Étape 1 sur 2</p><h2>Livraison</h2><span>Votre adresse de réception.</span></div><div className="checkout-fields two-cols"><input placeholder="Prénom" value={delivery.prenom} onChange={(e)=>setDelivery({...delivery,prenom:e.target.value})}/><input placeholder="Nom" value={delivery.nom} onChange={(e)=>setDelivery({...delivery,nom:e.target.value})}/><input className="full" placeholder="Adresse complète" value={delivery.adresse} onChange={(e)=>setDelivery({...delivery,adresse:e.target.value})}/><input placeholder="Ville" value={delivery.ville} onChange={(e)=>setDelivery({...delivery,ville:e.target.value})}/><input placeholder="Code postal" value={delivery.codePostal} onChange={(e)=>setDelivery({...delivery,codePostal:e.target.value})}/><input className="full" placeholder="Téléphone" value={delivery.telephone} onChange={(e)=>setDelivery({...delivery,telephone:e.target.value})}/></div><div className="checkout-actions"><button className="checkout-back" onClick={()=>setCheckoutOpen(false)}>Retour</button><button className="btn teal" onClick={()=>setCheckoutStep(2)}>Suivant</button></div></> : <><div className="checkout-card-head"><p>Étape 2 sur 2</p><h2>Paiement</h2><span>Choisissez votre mode de paiement.</span></div><div className="payment-methods"><label className={paymentMethod === "card" ? "selected" : ""}><input type="radio" checked={paymentMethod === "card"} onChange={()=>setPaymentMethod("card")}/>Carte bancaire</label><label className={paymentMethod === "cash" ? "selected" : ""}><input type="radio" checked={paymentMethod === "cash"} onChange={()=>setPaymentMethod("cash")}/>Paiement à la livraison</label></div>{paymentMethod === "card" && <div className="checkout-fields"><input placeholder="Nom sur la carte" value={card.name} onChange={(e)=>setCard({...card,name:e.target.value})}/><input placeholder="Numéro de carte" value={card.number} onChange={(e)=>setCard({...card,number:e.target.value})}/></div>}<div className="checkout-total"><span>Total à payer</span><b>{total} DH</b></div><div className="checkout-actions"><button className="checkout-back" onClick={()=>setCheckoutStep(1)}>Précédent</button><button className="btn teal" onClick={handlePlaceOrder}>Confirmer et payer</button></div></>}
+        {checkoutMessage && <div className="checkout-message">{checkoutMessage}</div>}
+        {checkoutStep === 2 && paymentMethod === 'card' && (
+          <div className="checkout-extra-fields">
+            <input placeholder="MM/AA" value={card.expiry} onChange={(e)=>setCard({...card,expiry:e.target.value})} />
+            <input placeholder="CVC" value={card.cvc} onChange={(e)=>setCard({...card,cvc:e.target.value})} />
+          </div>
+        )}
+        {checkoutStep === 1 ? <><div className="checkout-card-head"><p>Étape 1 sur 2</p><h2>Livraison</h2><span>Votre adresse de réception.</span></div><div className="checkout-fields two-cols"><input placeholder="Prénom" value={delivery.prenom} onChange={(e)=>setDelivery({...delivery,prenom:e.target.value})}/><input placeholder="Nom" value={delivery.nom} onChange={(e)=>setDelivery({...delivery,nom:e.target.value})}/><input className="full" placeholder="Adresse complète" value={delivery.adresse} onChange={(e)=>setDelivery({...delivery,adresse:e.target.value})}/><input placeholder="Ville" value={delivery.ville} onChange={(e)=>setDelivery({...delivery,ville:e.target.value})}/><input placeholder="Code postal" value={delivery.codePostal} onChange={(e)=>setDelivery({...delivery,codePostal:e.target.value})}/><input className="full" placeholder="Téléphone" value={delivery.telephone} onChange={(e)=>setDelivery({...delivery,telephone:e.target.value})}/></div><div className="checkout-actions"><button className="checkout-back" onClick={()=>setCheckoutOpen(false)}>Retour</button><button className="btn teal" onClick={handleNextStep}>Suivant</button></div></> : <><div className="checkout-card-head"><p>Étape 2 sur 2</p><h2>Paiement</h2><span>Choisissez votre mode de paiement.</span></div><div className="payment-methods"><label className={paymentMethod === "card" ? "selected" : ""}><input type="radio" checked={paymentMethod === "card"} onChange={()=>setPaymentMethod("card")}/>Carte bancaire</label><label className={paymentMethod === "cash" ? "selected" : ""}><input type="radio" checked={paymentMethod === "cash"} onChange={()=>setPaymentMethod("cash")}/>Paiement à la livraison</label></div>{paymentMethod === "card" && <div className="checkout-fields"><input placeholder="Nom sur la carte" value={card.name} onChange={(e)=>setCard({...card,name:e.target.value})}/><input placeholder="Numéro de carte" value={card.number} onChange={(e)=>setCard({...card,number:e.target.value})}/></div>}<div className="checkout-total"><span>Total à payer</span><b>{total} DH</b></div><div className="checkout-actions"><button className="checkout-back" onClick={()=>setCheckoutStep(1)}>Précédent</button><button className="btn teal" disabled={isPlacing} onClick={handlePlaceOrder}>{isPlacing ? "Traitement…" : "Confirmer et payer"}</button></div></>}
       </div></div>}    </main>
   );
 }

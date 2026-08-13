@@ -144,9 +144,10 @@ checkFollow(
     return this.boutiquesService.findOne(body.id);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Post('signale')
-  signaler(@Body() body: any) {
-    return this.boutiquesService.signaler(body.id, body.motif, body.description);
+  signaler(@Body() body: any, @CurrentUser() user: { id_user: number }) {
+    return this.boutiquesService.signaler(body.id, body.motif, body.description, user.id_user);
   }
 
   @UseGuards(JwtAuthGuard)

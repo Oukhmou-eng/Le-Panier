@@ -2,6 +2,7 @@ import "../../css/Boutique.css";
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { addToPanier } from "../../services/panierService";
+import ReportModal from "../../components/ReportModal";
 
 
 const TABS = [
@@ -24,6 +25,11 @@ function Produit() {
   const [similarBy, setSimilarBy] = useState("categorie");
   const [similarProducts, setSimilarProducts] = useState([]);
   const [showAvisDialog, setShowAvisDialog] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportMotif, setReportMotif] = useState("");
+  const [reportDescription, setReportDescription] = useState("");
+  const [reportStatus, setReportStatus] = useState("");
+  const [reportError, setReportError] = useState("");
   const [isContactingSeller, setIsContactingSeller] = useState(false);
   const [contactError, setContactError] = useState(null);
 
@@ -42,8 +48,6 @@ const fetchProduct = async () => {
     const data = await res.json();
 
     // Adapte les champs SQL au format attendu par le composant.
-    // TODO: ajuster les clés (data.nom, data.prix, etc.) selon la vraie
-    // forme de la réponse renvoyée par votre service.
     setProduct({
       name: data?.nom,
       price: data?.prix,
@@ -52,6 +56,11 @@ const fetchProduct = async () => {
       shopName: data?.boutique_nom,
       shopId: data?.id_boutique,
       categoryId: data?.id_categorie,
+      saleType: data?.type_reduction,
+      saleValue: data?.valeur_reduction,
+      salePrice: data?.prix_promo,
+      saleStart: data?.date_debut,
+      saleEnd: data?.date_fin,
     });
 
     // TODO: confirmer que le backend renvoie bien un tableau de médias
@@ -212,6 +221,45 @@ const fetchReviews = async () => {
     }
   };
 
+  const handleSubmitProductReport = async () => {
+    setReportStatus("");
+    setReportError("");
+
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setReportError("Vous devez être connecté pour signaler ce produit.");
+      navigate('/login');
+      return;
+    }
+
+    try {
+      const res = await fetch(`http://localhost:3000/produits/${id}/signale`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          motif: reportMotif,
+          description: reportDescription,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.message || "Impossible d'envoyer le signalement.");
+      }
+
+      setReportStatus(data?.message || "Signalement envoyé avec succès.");
+      setReportMotif("");
+      setReportDescription("");
+      setShowReportModal(false);
+    } catch (error) {
+      console.error("Erreur lors de l'envoi du signalement", error);
+      setReportError(error.message || "Une erreur est survenue.");
+    }
+  };
+
   const handleContactSeller = async () => {
     const token = localStorage.getItem("token");
     if (!token) {
@@ -343,9 +391,44 @@ const fetchReviews = async () => {
               </a>
             </div>
             <h1>{product?.name}</h1>
+            {product?.salePrice && (
+              <div className="sale-badge">
+                <strong>
+                  {product.saleType === 'pourcentage'
+                    ? `-${product.saleValue}%`
+                    : `-${product.saleValue} MAD`}
+                </strong>
+                <span>Offre limitée</span>
+              </div>
+            )}
             <div className="fiche-price">
-              {product?.price != null ? `${product.price} MAD` : ""}
+              {product?.salePrice ? (
+                <>
+                  <span className="price-old">{product.price} MAD</span>
+                  <span className="price-current">{product.salePrice} MAD</span>
+                </>
+              ) : (
+                product?.price != null ? `${product.price} MAD` : ""
+              )}
             </div>
+            {product?.salePrice && (
+              <div className="price-meta">
+                <span>
+                  {product.saleType === 'pourcentage'
+                    ? `${product.saleValue}% de réduction`
+                    : `-${product.saleValue} MAD`}
+                </span>
+                {product.saleEnd && (
+                  <span>
+                    Expire le {new Date(product.saleEnd).toLocaleDateString('fr-FR', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric',
+                    })}
+                  </span>
+                )}
+              </div>
+            )}
             <p className="fiche-desc">{product?.description}</p>
             <div className="fiche-actions">
               <button className="btn teal" onClick={handleAddToCart}>
@@ -354,7 +437,22 @@ const fetchReviews = async () => {
               <button className="btn outline" onClick={handleContactSeller}>
                 Contacter le vendeur
               </button>
+              <button className="btn outline" onClick={() => setShowReportModal(true)}>
+                ⚑ Signaler ce produit
+              </button>
             </div>
+            <ReportModal
+              isOpen={showReportModal}
+              onClose={() => setShowReportModal(false)}
+              title="Signaler ce produit"
+              motif={reportMotif}
+              description={reportDescription}
+              setMotif={setReportMotif}
+              setDescription={setReportDescription}
+              onSubmit={handleSubmitProductReport}
+              statusMessage={reportStatus}
+              errorMessage={reportError}
+            />
           </div>
         </div>
 

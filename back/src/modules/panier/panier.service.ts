@@ -10,10 +10,15 @@ export class PanierService {
   private readonly cartItemSelect = `
     SELECT pi.id_panier_item AS id, pi.id_user, pi.id_produit, pi.quantite,
       p.nom, p.prix, p.stock, p.id_boutique, b.nom AS boutique_nom,
-      b.logo_url AS boutique_logo_url, pm.url AS image_url
+      b.logo_url AS boutique_logo_url, pm.url AS image_url,
+      s.type_reduction, s.valeur_reduction, s.prix_promo, s.date_debut, s.date_fin
     FROM panier_items pi
     INNER JOIN produits p ON p.id_produit = pi.id_produit
     INNER JOIN boutiques b ON b.id_boutique = p.id_boutique
+    LEFT JOIN soldes s ON s.id_produit = p.id_produit
+      AND s.statut = 'active'
+      AND s.date_debut <= NOW()
+      AND s.date_fin >= NOW()
     LEFT JOIN produit_medias pm ON pm.id_media = (
       SELECT pm2.id_media FROM produit_medias pm2
       WHERE pm2.id_produit = p.id_produit

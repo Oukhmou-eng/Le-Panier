@@ -39,13 +39,26 @@ function PublierProduit() {
   };
 
   useEffect(() => {
+    const normalizeCategories = (data) => {
+      if (!Array.isArray(data)) return [];
+      return data.map((cat) => {
+        if (typeof cat === 'string') {
+          return { id: String(cat), label: cat };
+        }
+        const categoryId = cat.id ?? cat.id_categorie ?? cat.label ?? cat.nom ?? JSON.stringify(cat);
+        return {
+          id: String(categoryId),
+          label: cat.label ?? cat.nom ?? String(cat),
+        };
+      });
+    };
+
     const loadCategories = async () => {
       try {
         const response = await fetch(`${API_URL}/categories`);
         if (!response.ok) throw new Error('Impossible de charger les catégories.');
         const data = await response.json();
-        setCategories(Array.isArray(data) ? data : []);
-
+        setCategories(normalizeCategories(data));
       } catch {
         setCategories([]);
       }
@@ -64,7 +77,7 @@ function PublierProduit() {
         const product = await response.json();
         setForm({
           nom: product.nom || '',
-          categorie: product.categorie_nom || product.categorie || '',
+          categorie: product.id_categorie ? String(product.id_categorie) : product.categorie_nom || product.categorie || '',
           prix: product.prix ?? '',
           stock: product.stock ?? '',
           description: product.description || '',
@@ -219,7 +232,11 @@ function PublierProduit() {
               <label>Catégorie</label>
               <select name="categorie" value={form.categorie} onChange={updateField} required>
                 <option value="">Choisir une catégorie</option>
-                {categories.map((categorie) => <option value={categorie} key={categorie}>{categorie}</option>)}
+                {categories.map((categorie) => (
+                  <option value={categorie.id} key={categorie.id}>
+                    {categorie.label}
+                  </option>
+                ))}
               </select>
             </div>
 

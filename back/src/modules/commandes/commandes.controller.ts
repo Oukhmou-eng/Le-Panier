@@ -10,8 +10,8 @@ export class CommandesController {
   constructor(private readonly commandesService: CommandesService) {}
 
   @Post()
-  create(@Body() dto: CreateCommandeDto) {
-    return this.commandesService.create(dto);
+  create(@CurrentUser() user: { id_user: number }, @Body() dto: CreateCommandeDto) {
+    return this.commandesService.create(user.id_user, dto);
   }
 
   @Get()
@@ -27,9 +27,22 @@ export class CommandesController {
     return this.commandesService.getStatistics(user, body.periode ?? 7);
   }
 
+  @Get('utilisateur/me')
+  findByCurrentUser(@CurrentUser() user: { id_user: number }) {
+    return this.commandesService.findByUser(user.id_user);
+  }
+
+  // Les routes statiques doivent être déclarées avant :userId, sinon « me »
+  // est interprété comme un identifiant utilisateur.
   @Get('utilisateur/:userId')
   findByUser(@Param('userId') userId: string) {
     return this.commandesService.findByUser(+userId);
+  }
+
+  @Get('utilisateur/me/debug')
+  async debugCurrentUser(@CurrentUser() user: any) {
+    const commandes = await this.commandesService.findByUser(user?.id_user ?? null);
+    return { user, commandes };
   }
 
   @Get('boutique/:boutiqueId')
@@ -43,8 +56,12 @@ export class CommandesController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: Partial<CreateCommandeDto>) {
-    return this.commandesService.update(+id, dto);
+  update(
+    @Param('id') id: string,
+    @CurrentUser() user: { id_user: number },
+    @Body() dto: { statut?: string },
+  ) {
+    return this.commandesService.updateStatusForBoutique(+id, user.id_user, dto.statut);
   }
 
   @Delete(':id')

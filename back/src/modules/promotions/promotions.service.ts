@@ -27,6 +27,29 @@ export class PromotionsService {
     );
   }
 
+  async adminFindFactures() {
+    return this.db.query(
+      `SELECT
+         fb.id,
+         fb.boutique_id,
+         b.nom AS boutique_nom,
+         b.slug AS boutique_slug,
+         fb.type_facture,
+         fb.reference_id,
+         fb.moyen_paiement_id,
+         mp.fournisseur AS paiement_fournisseur,
+         fb.montant,
+         fb.statut,
+         fb.reference_transaction,
+         fb.date_facture,
+         fb.date_paiement
+       FROM factures_boutique fb
+       LEFT JOIN boutiques b ON b.id_boutique = fb.boutique_id
+       LEFT JOIN moyens_paiement mp ON mp.id_moyen_paiement = fb.moyen_paiement_id
+       ORDER BY fb.date_facture DESC`,
+    );
+  }
+
   async findPlanById(id: number) {
     const rows = await this.db.query<RowDataPacket[]>(`SELECT * FROM plans_tarifs WHERE id = ? LIMIT 1`, [id]);
     return rows?.[0] ?? null;

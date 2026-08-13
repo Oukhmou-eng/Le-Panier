@@ -1,0 +1,135 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600&family=Sora:wght@400;500;600;700&display=swap');
+
+:root {
+  --bg: #FAFAF8;
+  --panel: #FFFFFF;
+  --ink: #1D1B2E;
+  --ink-soft: #6B6B76;
+  --line: #E7E5DE;
+  --teal: #2F6F5E;
+  --teal-dark: #234F42;
+  --danger: #C1543A;
+}
+
+.sidebar.admin-sidebar {
+  width: 260px;
+  background: #fff;
+  border-right: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  padding: 24px 18px;
+  position: sticky;
+  top: 104px;
+  height: calc(100vh - 104px);
+  font-family: 'Sora', sans-serif;
+}
+
+.sidebar.admin-sidebar .sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.sidebar.admin-sidebar .brand-icon {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: var(--teal);
+  color: #fff;
+  font-size: 18px;
+}
+
+.sidebar.admin-sidebar .brand-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sidebar.admin-sidebar .brand-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.sidebar.admin-sidebar .brand-subtitle {
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.sidebar.admin-sidebar .sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.sidebar.admin-sidebar .snav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  color: var(--ink-soft);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all .2s ease;
+}
+
+.sidebar.admin-sidebar .snav-item:hover {
+  background: #F1F0EA;
+  color: var(--ink);
+}
+
+.sidebar.admin-sidebar .snav-item.active {
+  background: #EFF5F2;
+  color: var(--teal-dark);
+}
+
+.sidebar.admin-sidebar .snav-item .ic {
+  width: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+
+.sidebar.admin-sidebar .sidebar-foot {
+  margin-top: 18px;
+}
+
+.sidebar.admin-sidebar .btn-logout {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: #FEEDEE;
+  border: 1px solid rgba(193, 84, 58, 0.15);
+  border-radius: 14px;
+  color: var(--danger);
+  font-weight: 700;
+  cursor: pointer;
+  text-align: left;
+}
+
+.sidebar.admin-sidebar .btn-logout:hover {
+  background: #FCE8E4;
+}
+
+.app-connected.active .sidebar.admin-sidebar {
+  min-width: 260px;
+}
+
+@media (max-width: 960px) {
+  .sidebar.admin-sidebar {
+    width: 100%;
+    position: static;
+    height: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+  }
+}

@@ -174,16 +174,22 @@ async findOne(id: number) {
     const boutique = await this.db.query(
       `
       SELECT
-        id_boutique,
-        nom,
-        logo_url,
-        banniere_url,
-        note_moyenne,
-        date_creation,
-        estVerifier,
-        description
-      FROM boutiques
-      WHERE id_boutique = ?
+        b.id_boutique,
+        b.nom,
+        b.logo_url,
+        b.banniere_url,
+        b.note_moyenne,
+        b.date_creation,
+        b.estVerifier,
+        b.description,
+        i.adresse,
+        i.tele,
+        i.emailprof,
+        i.instagram,
+        i.facebook
+      FROM boutiques b
+      LEFT JOIN infoboutique i ON i.id_boutique = b.id_boutique
+      WHERE b.id_boutique = ?
       `,
       [id],
     );
@@ -510,20 +516,18 @@ async update(id: number, userId: number, dto: Partial<CreateBoutiqueDto>) {
     return { id };
   }
 
-async signaler(id: number, motif: string, description: string) {
+async signaler(id: number, motif: string, description: string, idUser: number) {
   try {
-    
     await this.db.query(
       `
       INSERT INTO signalements (id_user,type_cible,id_cible, motif, description, date_creation, statut)
-      VALUES (1,'boutique',?, ?, ?, NOW(), 'en_cours')
+      VALUES (?, 'boutique', ?, ?, ?, NOW(), 'en_cours')
       `,
-      [id, motif, description],
+      [idUser, id, motif, description],
     );
 
-return { success: true, message: 'Signalement envoyé avec succès.' };
-  }catch (error) {
-    
+    return { success: true, message: 'Signalement envoyé avec succès.' };
+  } catch (error) {
     return { success: false, message: 'Une erreur est survenue lors de l\'envoi du signalement.' };
   }
 }

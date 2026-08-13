@@ -1,39 +1,93 @@
-﻿import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { CreateCategorieDto } from './dto/create-categorie.dto';
 import { DatabaseService } from '../../database/database.service'; 
 
 @Injectable()
 export class CategoriesService {
   constructor(private readonly db: DatabaseService) {}
-  create(dto: CreateCategorieDto) {
-    // TODO: this.prisma.categories.create({ data: dto })
-    return dto;
-  }
 
- async findAll() {
-    const categories = await this.db.query(
-      'SELECT * FROM categories'
-    ) as any[];
-    if (categories.length === 0) {
-      return { error: 'Aucune catégorie trouvée' };
+  async create(dto: CreateCategorieDto) {
+    const payload = dto as any;
+    const rawName = payload.nom ?? payload.name;
+    const rawIcon = payload.icone ?? payload.icon;
+    const rawStatus = payload.statut ?? payload.status;
+
+    if (!rawName || typeof rawName !== 'string' || !rawName.trim()) {
+      throw new BadRequestException('Le nom de la catégorie est requis.');
     }
 
-    return categories.map((cat: any) => cat.nom);
+    const nom = rawName.trim();
+    const icone = typeof rawIcon === 'string' && rawIcon.trim() ? rawIcon.trim() : null;
+    const statut = rawStatus === 'inactif' ? 'inactif' : 'actif';
+
+    const result: any = await this.db.query(
+      'INSERT INTO categories (nom, icone, statut) VALUES (?, ?, ?)',
+      [nom, icone, statut],
+    );
+
+    const insertId = (result as any).insertId ?? null;
+    return { id_categorie: insertId, nom, icone, statut };
   }
 
-  findOne(id: number) {
-    // TODO: this.prisma.categories.findUnique({ where: { id } })
-    return { id };
+  async findAll() {
+    const categories = await this.db.query(
+      'SELECT id_categorie, nom, icone, statut FROM categories ORDER BY nom ASC'
+    ) as any[];
+    return categories;
   }
 
-  update(id: number, dto: Partial<CreateCategorieDto>) {
-    // TODO: this.prisma.categories.update({ where: { id }, data: dto })
-    return { id, ...dto };
+  async findNames() {
+    const categories = await this.db.query(
+      'SELECT id_categorie, nom FROM categories ORDER BY nom ASC'
+    ) as any[];
+    return categories.map((cat: any) => ({ id: cat.id_categorie, label: cat.nom }));
   }
 
-  remove(id: number) {
-    // TODO: this.prisma.categories.delete({ where: { id } })
-    return { id };
+  async findOne(id: number) {
+    const categories = await this.db.query(
+      'SELECT id_categorie, nom, icone, statut FROM categories WHERE id_categorie = ? LIMIT 1',
+      [id],
+    ) as any[];
+    return categories[0] ?? null;
+  }
+
+  async update(id: number, dto: Partial<CreateCategorieDto>) {
+    if (!dto.nom && dto.icone === undefined && dto.statut === undefined) {
+      return this.findOne(id);
+    }
+
+    const updates: string[] = [];
+    const params: any[] = [];
+
+    if (dto.nom !== undefined) {
+      updates.push('nom = ?');
+      params.push(dto.nom.trim());
+    }
+    if (dto.icone !== undefined) {
+      updates.push('icone = ?');
+      params.push(dto.icone?.trim() || null);
+    }
+    if (dto.statut !== undefined) {
+      updates.push('statut = ?');
+      params.push(dto.statut === 'inactif' ? 'inactif' : 'actif');
+    }
+
+    if (!updates.length) {
+      return this.findOne(id);
+    }
+
+    params.push(id);
+    await this.db.query(
+      `UPDATE categories SET ${updates.join(', ')} WHERE id_categorie = ?`,
+      params,
+    );
+
+    return this.findOne(id);
+  }
+
+  async remove(id: number) {
+    await this.db.query('DELETE FROM categories WHERE id_categorie = ?', [id]);
+    return { id_categorie: id };
   }
 
 async findSearch(search: string) {
@@ -113,7 +167,7 @@ async filtre(
 
     // Recherche texte (nom produit, boutique, catégorie)
     if (search && search.trim()) {
-      const mot = `%${search}%`;
+      const mot = `${search.trim()}%`;
       where.push(`(p.nom LIKE ? OR b.nom LIKE ? OR c.nom LIKE ?)`);
       params.push(mot, mot, mot);
     }
@@ -170,7 +224,10 @@ async filtre(
         p.prix,
         b.nom AS boutique_nom,
         pm.url,
-        pm.type
+        pm.type,
+        s.type_reduction,
+        s.valeur_reduction,
+        s.prix_promo
       FROM produits p
       INNER JOIN categories c ON c.id_categorie = p.id_categorie
       INNER JOIN boutiques b ON b.id_boutique = p.id_boutique
@@ -179,6 +236,15 @@ async filtre(
         FROM produit_medias pm2
         WHERE pm2.id_produit = p.id_produit
         ORDER BY pm2.ordre ASC, pm2.id_media ASC
+        LIMIT 1
+      )
+      LEFT JOIN soldes s ON s.id_solde = (
+        SELECT s2.id_solde
+        FROM soldes s2
+        WHERE s2.id_produit = p.id_produit
+          AND s2.statut = 'active'
+          AND NOW() BETWEEN s2.date_debut AND s2.date_fin
+        ORDER BY s2.date_creation DESC, s2.id_solde DESC
         LIMIT 1
       )
       ${whereClause}

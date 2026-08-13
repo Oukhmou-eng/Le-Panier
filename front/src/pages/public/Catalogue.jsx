@@ -1,7 +1,7 @@
 import "../../css/Catalogue.css";
 import "../../css/Favoris.css";
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import "../../css/Dialogue.css";
 
 /* =========================================================
@@ -36,18 +36,22 @@ const SORT_OPTIONS = [
 function normalizeCategories(data) {
   const list = Array.isArray(data) ? data : data?.categories ?? [];
   return list.map((cat) => ({
-    id: cat.id ?? cat._id ?? cat.slug ?? cat,
+    id: String(cat.id_categorie ?? cat.id ?? cat._id ?? cat.slug ?? cat),
     label: cat.nom ?? cat.label ?? cat.name ?? String(cat),
   }));
 }
 
 function Catalogue() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [showFavDialog, setShowFavDialog] = useState(false);
 
   /* ---------- Recherche / filtres / tri / pagination ---------- */
-  const [search, setSearch] = useState("");
-  const [selectedCategories, setSelectedCategories] = useState([]);
+  const [search, setSearch] = useState(() => searchParams.get("search") ?? "");
+  const [selectedCategories, setSelectedCategories] = useState(() => {
+    const category = searchParams.get("category");
+    return category ? [category] : [];
+  });
   const [selectedPriceRanges, setSelectedPriceRanges] = useState([]);
   const [minRating, setMinRating] = useState(false);
   const [selectedConditions, setSelectedConditions] = useState([]);
@@ -98,7 +102,13 @@ function Catalogue() {
         id: p.id_produit,
         name: p.nom,
         shop: p.boutique_nom,
-        price: p.prix,
+        price: Number(p.prix ?? 0),
+        pricePromo: p.prix_promo === null || p.prix_promo === undefined ? null : Number(p.prix_promo),
+        discountPercent: p.type_reduction === "pourcentage"
+          ? Number(p.valeur_reduction ?? 0)
+          : p.prix_promo !== null && p.prix_promo !== undefined && Number(p.prix) > 0
+            ? Math.round(((Number(p.prix) - Number(p.prix_promo)) / Number(p.prix)) * 100)
+            : 0,
         mediaUrl: p.url,
         mediaType: p.type,
       }));
@@ -145,6 +155,12 @@ function Catalogue() {
     handleCat();
     loadFavoris();
   }, []);
+
+  useEffect(() => {
+    setSearch(searchParams.get("search") ?? "");
+    const category = searchParams.get("category");
+    setSelectedCategories(category ? [category] : []);
+  }, [searchParams]);
 
   // Un changement de filtre/tri doit repartir de la page 1
   useEffect(() => {
@@ -447,6 +463,7 @@ if (!token) {
               <div className="catalogue-grid">
                 {produits.map((product) => {
                   const estFavori = favoris.has(product.id);
+                  const estEnSolde = product.pricePromo !== null && product.pricePromo < product.price;
                   return (
                   <div
                     className="card"
@@ -465,6 +482,9 @@ if (!token) {
                           : undefined
                       }
                     >
+                      {estEnSolde && product.discountPercent > 0 && (
+                        <span className="solde-badge">-{product.discountPercent}%</span>
+                      )}
                       <span className="play">▶</span>
                     </div>
                     <div className="card-body">
@@ -479,9 +499,16 @@ if (!token) {
                       />
                       <div className="name">{product.name}</div>
                       <div className="shop">{product.shop}</div>
-                      <div className="price">
-                        {product.price != null ? `${product.price} MAD` : "—"}
-                      </div>
+                      {estEnSolde ? (
+                        <div className="solde-prices">
+                          <span className="price-old">{product.price} MAD</span>
+                          <span className="price">{product.pricePromo} MAD</span>
+                        </div>
+                      ) : (
+                        <div className="price">
+                          {product.price != null ? `${product.price} MAD` : "—"}
+                        </div>
+                      )}
                     </div>
                   </div>
                   );

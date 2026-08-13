@@ -1,6 +1,10 @@
-﻿import { Controller, Get, Post, Body, Param, Patch, Delete } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { CreateSignalementDto } from './dto/create-signalement.dto';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { RolesGuard } from '../../common/guards/roles.guard';
 
 @Controller('admin')
 export class AdminController {
@@ -14,6 +18,31 @@ export class AdminController {
   @Get()
   findAll() {
     return this.adminService.findAll();
+  }
+
+  @Get('dashboard')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  getDashboard() {
+    return this.adminService.getDashboard();
+  }
+
+  @Get('signalements')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  findSignalements() {
+    return this.adminService.findAllSignalements();
+  }
+
+  @Patch('signalements/:id/status')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  updateSignalementStatus(
+    @Param('id') id: string,
+    @Body('statut') statut: string,
+    @CurrentUser() user: { id_user: number },
+  ) {
+    return this.adminService.updateSignalementStatus(+id, statut, user.id_user);
   }
 
   @Get(':id')

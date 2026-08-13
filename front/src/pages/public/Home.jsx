@@ -20,7 +20,15 @@ const [showFavDialog, setShowFavDialog] = useState(false);
   return products.map((item) => ({
     id: item.id_produit,
     nom: item.nom || "",
-    prix: item.prix ?? 0,
+    prix: Number(item.prix ?? 0),
+    prixPromo: item.prix_promo === null || item.prix_promo === undefined
+      ? null
+      : Number(item.prix_promo),
+    reductionPourcentage: item.type_reduction === "pourcentage"
+      ? Number(item.valeur_reduction ?? 0)
+      : item.prix_promo !== null && item.prix_promo !== undefined && Number(item.prix) > 0
+        ? Math.round(((Number(item.prix) - Number(item.prix_promo)) / Number(item.prix)) * 100)
+        : 0,
     boutique: item.boutique_nom || "",
     url: item.url || "",
     type: (item.type || "").toLowerCase(),
@@ -105,6 +113,7 @@ return (
       <div className="grid" id="homeGrid">
   {normalizeProducts(info).map((produit) => {
     const estFavori = favoris.has(produit.id);
+    const estEnSolde = produit.prixPromo !== null && produit.prixPromo < produit.prix;
     return (
     <div
       key={produit.id}
@@ -116,6 +125,9 @@ return (
       
     >
       <div className="thumb">
+        {estEnSolde && produit.reductionPourcentage > 0 && (
+          <span className="home-solde-badge">-{produit.reductionPourcentage}%</span>
+        )}
         {produit.type?.startsWith("video") ? (
           <video
             src={produit.url}
@@ -153,7 +165,14 @@ return (
         
         <div className="name">{produit.nom}</div>
         <div className="shop">{produit.boutique}</div>
-        <div className="price">{produit.prix} MAD</div>
+        {estEnSolde ? (
+          <div className="home-solde-prices">
+            <span className="home-price-old">{produit.prix} MAD</span>
+            <span className="price">{produit.prixPromo} MAD</span>
+          </div>
+        ) : (
+          <div className="price">{produit.prix} MAD</div>
+        )}
       </div>
     </div>
     );

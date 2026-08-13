@@ -30,6 +30,13 @@ export class PromotionsController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
+  @Get('admin/factures')
+  adminFindFactures() {
+    return this.promotionsService.adminFindFactures();
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   @Post('admin/plans')
   adminCreatePlan(
     @CurrentUser() user: { id_user: number },

@@ -1,0 +1,303 @@
+.plan-tarifs-page {
+  width: 100%;
+  padding: 36px 32px 60px;
+  min-height: calc(100vh - 90px);
+  background: radial-gradient(circle at top, rgba(37, 133, 110, 0.08), transparent 45%), #f7fcf8;
+}
+
+.plan-tarifs {
+  max-width: 1080px;
+  margin: 0 auto;
+  border-radius: 28px;
+  padding: 28px;
+  background: #ffffff;
+  box-shadow: 0 24px 80px rgba(17, 30, 23, 0.08);
+}
+
+.plan-tarifs__header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+
+.plan-tarifs__eyebrow {
+  color: #0f6f53;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.plan-tarifs__header h1 {
+  margin: 5px 0 10px;
+  font-size: clamp(28px, 3vw, 36px);
+  line-height: 1.05;
+}
+
+.plan-tarifs__header p {
+  margin: 0;
+  color: #4d5a57;
+  font-size: 14px;
+  max-width: 720px;
+}
+
+.plan-tarifs__header-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.plan-tarifs__notice,
+.plan-tarifs__empty {
+  margin-top: 18px;
+  padding: 22px 24px;
+  border: 1px solid rgba(41, 115, 85, 0.15);
+  border-radius: 18px;
+  color: #254032;
+  background: #f3fbf5;
+  font-size: 14px;
+}
+
+.plan-tarifs__notice--error {
+  border-color: #f1c6c0;
+  background: #fff3f1;
+  color: #9f2d24;
+}
+
+.plan-tarifs__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 22px;
+  padding: 18px 20px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(17, 111, 74, 0.06), rgba(255, 255, 255, 0.9));
+  border: 1px solid rgba(17, 111, 74, 0.12);
+}
+
+.plan-tarifs__summary {
+  color: #185f47;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.plan-tarifs__summary strong {
+  color: #0f4d3d;
+}
+
+.plan-tarifs__list {
+  display: grid;
+  gap: 18px;
+}
+
+.plan-tarif-card {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 22px;
+  border-radius: 22px;
+  border: 1px solid rgba(46, 102, 78, 0.12);
+  background: #fcfffb;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.plan-tarif-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 40px rgba(37, 79, 55, 0.08);
+}
+
+.plan-tarif-card__content {
+  display: grid;
+  gap: 14px;
+}
+
+.plan-tarif-card__title {
+  margin: 0;
+  font-size: 20px;
+  color: #134e38;
+}
+
+.plan-tarif-card__details {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  color: #4e635c;
+  font-size: 13px;
+}
+
+.plan-tarif-card__detail {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.plan-tarif-card__detail::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #17a679;
+}
+
+.plan-tarif-card__status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 84px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(23, 166, 121, 0.12);
+  color: #11644a;
+  font-weight: 700;
+  font-size: 12px;
+  text-transform: capitalize;
+}
+
+.plan-tarif-card__status.inactif {
+  background: rgba(207, 94, 79, 0.12);
+  color: #8d2e23;
+}
+
+.plan-tarif-card__meta {
+  display: grid;
+  gap: 8px;
+  color: #6a7a70;
+  font-size: 12px;
+}
+
+.plan-tarif-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: center;
+}
+
+.plan-tarif-card__actions button,
+.plan-tarif-card__actions select {
+  min-width: 150px;
+}
+
+.plan-tarifs__overlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 30px;
+  background: rgba(17, 28, 21, 0.55);
+  backdrop-filter: blur(3px);
+  z-index: 50;
+}
+
+.plan-tarifs__modal {
+  width: min(100%, 780px);
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+  padding: 28px;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: linear-gradient(180deg, #ffffff 0%, #f4faf4 100%);
+  box-shadow: 0 24px 80px rgba(16, 41, 24, 0.22);
+}
+
+.plan-tarifs__modal-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-start;
+  margin-bottom: 22px;
+}
+
+.plan-tarifs__modal-header h2 {
+  margin: 0;
+  font-size: 24px;
+  color: #154f3c;
+}
+
+.plan-tarifs__modal-header p {
+  margin: 6px 0 0;
+  color: #5d6d63;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.plan-tarifs__form {
+  display: grid;
+  gap: 18px;
+}
+
+.plan-tarif-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.plan-tarif-field {
+  display: grid;
+  gap: 8px;
+}
+
+.plan-tarif-field label {
+  font-size: 13px;
+  color: #55655d;
+}
+
+.plan-tarif-field input,
+.plan-tarif-field select {
+  width: 100%;
+  border: 1px solid rgba(91, 154, 126, 0.22);
+  border-radius: 16px;
+  padding: 14px 15px;
+  background: #fdfdf9;
+  color: #22332a;
+  font: inherit;
+  font-size: 14px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.plan-tarif-field input:focus,
+.plan-tarif-field select:focus {
+  outline: none;
+  border-color: #15956d;
+  box-shadow: 0 0 0 3px rgba(21, 149, 109, 0.12);
+}
+
+.plan-tarifs__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.plan-tarifs__actions button {
+  min-width: 140px;
+}
+
+@media (max-width: 900px) {
+  .plan-tarif-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .plan-tarifs__header {
+    align-items: stretch;
+  }
+}
+
+@media (max-width: 680px) {
+  .plan-tarif-card__details {
+    grid-template-columns: 1fr;
+  }
+
+  .plan-tarif-card__actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .plan-tarif-card__actions button,
+  .plan-tarif-card__actions select {
+    width: 100%;
+  }
+}

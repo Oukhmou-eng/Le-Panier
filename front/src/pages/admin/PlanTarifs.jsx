@@ -1,4 +1,4 @@
-import "../../css/Boutiques.css";
+import "../../css/PlanTarifs.css";
 import { useEffect, useMemo, useState } from "react";
 import { getTokenPayload } from "../../store/authStore";
 
@@ -190,24 +190,28 @@ export default function PlanTarifsAdmin() {
   const activePlans = useMemo(() => plans.sort((a, b) => b.priorite - a.priorite || (a.prix - b.prix)), [plans]);
 
   return (
-    <main className="directory-shops-page">
-      <section className="directory-shops" aria-labelledby="admin-plans-title">
-        <header className="directory-shops__header">
-          <span className="directory-shops__eyebrow">Administration</span>
-          <h1 id="admin-plans-title">Gestion des plans tarifaires</h1>
-          <p>Ajoutez, modifiez et suspendez des plans tarifaires.</p>
-          <button className="btn teal btn-sm" type="button" onClick={openCreateForm}>
-            Ajouter un plan
-          </button>
+    <main className="plan-tarifs-page">
+      <section className="plan-tarifs" aria-labelledby="admin-plans-title">
+        <header className="plan-tarifs__header">
+          <div>
+            <span className="plan-tarifs__eyebrow">Administration</span>
+            <h1 id="admin-plans-title">Gestion des plans tarifaires</h1>
+            <p>Ajoutez, modifiez et suspendez des plans tarifaires pour les boutiques et produits.</p>
+          </div>
+          <div className="plan-tarifs__header-actions">
+            <button className="btn teal btn-sm" type="button" onClick={openCreateForm}>
+              Ajouter un plan
+            </button>
+          </div>
         </header>
 
-        {message && <div className="directory-shops__notice">{message}</div>}
-        {error && <div className="directory-shops__notice directory-shops__notice--error">{error}</div>}
+        {message && <div className="plan-tarifs__notice">{message}</div>}
+        {error && <div className="plan-tarifs__notice plan-tarifs__notice--error">{error}</div>}
 
         {showForm && (
-          <div className="directory-shops__overlay">
-            <div className="directory-shops__modal">
-              <div className="directory-shops__modal-header">
+          <div className="plan-tarifs__overlay">
+            <div className="plan-tarifs__modal">
+              <div className="plan-tarifs__modal-header">
                 <div>
                   <h2>{formMode === "create" ? "Créer un nouveau plan" : "Modifier le plan"}</h2>
                   <p>Définissez le nom, la cible, la durée, le prix, la priorité et le statut.</p>
@@ -216,25 +220,25 @@ export default function PlanTarifsAdmin() {
                   Fermer
                 </button>
               </div>
-              <form className="directory-shops__form" onSubmit={handleSubmit} autoComplete="off" noValidate>
-                <div className="directory-shops__grid">
-                  <label>
-                    Nom du plan
+              <form className="plan-tarifs__form" onSubmit={handleSubmit} autoComplete="off" noValidate>
+                <div className="plan-tarif-fields">
+                  <div className="plan-tarif-field">
+                    <label>Nom du plan</label>
                     <input
                       value={nomPlan}
                       onChange={(event) => setNomPlan(event.target.value)}
                       required
                     />
-                  </label>
-                  <label>
-                    Cible
+                  </div>
+                  <div className="plan-tarif-field">
+                    <label>Cible</label>
                     <select value={typeCible} onChange={(event) => setTypeCible(event.target.value)}>
                       <option value="produit">Produit</option>
                       <option value="boutique">Boutique</option>
                     </select>
-                  </label>
-                  <label>
-                    Durée (jours)
+                  </div>
+                  <div className="plan-tarif-field">
+                    <label>Durée (jours)</label>
                     <input
                       type="number"
                       min="1"
@@ -242,9 +246,9 @@ export default function PlanTarifsAdmin() {
                       onChange={(event) => setDureeJours(Number(event.target.value))}
                       required
                     />
-                  </label>
-                  <label>
-                    Prix
+                  </div>
+                  <div className="plan-tarif-field">
+                    <label>Prix</label>
                     <input
                       type="number"
                       min="0"
@@ -253,9 +257,9 @@ export default function PlanTarifsAdmin() {
                       onChange={(event) => setPrix(Number(event.target.value))}
                       required
                     />
-                  </label>
-                  <label>
-                    Priorité
+                  </div>
+                  <div className="plan-tarif-field">
+                    <label>Priorité</label>
                     <input
                       type="number"
                       min="0"
@@ -263,16 +267,16 @@ export default function PlanTarifsAdmin() {
                       onChange={(event) => setPriorite(Number(event.target.value))}
                       required
                     />
-                  </label>
-                  <label>
-                    Statut
+                  </div>
+                  <div className="plan-tarif-field">
+                    <label>Statut</label>
                     <select value={statut} onChange={(event) => setStatut(event.target.value)}>
                       <option value="actif">Actif</option>
                       <option value="inactif">Inactif</option>
                     </select>
-                  </label>
+                  </div>
                 </div>
-                <div className="directory-shops__actions" style={{ display: 'flex', gap: 12 }}>
+                <div className="plan-tarifs__actions">
                   <button className="btn teal btn-sm" type="submit" disabled={submitting}>
                     {submitting ? "Enregistrement…" : formMode === "create" ? "Créer le plan" : "Enregistrer les modifications"}
                   </button>
@@ -285,44 +289,37 @@ export default function PlanTarifsAdmin() {
           </div>
         )}
 
-        <div className="directory-shops__tools" style={{ gap: 16, flexWrap: 'wrap' }}>
-          <p>{activePlans.length} plan{activePlans.length > 1 ? 's' : ''} tarifaire{activePlans.length > 1 ? 's' : ''}</p>
+        <div className="plan-tarifs__toolbar">
+          <p className="plan-tarifs__summary">
+            <strong>{activePlans.length}</strong> plan{activePlans.length > 1 ? 's' : ''} tarifaire{activePlans.length > 1 ? 's' : ''} chargé{activePlans.length > 1 ? 's' : ''}.
+          </p>
         </div>
 
         {loading ? (
-          <div className="directory-shops__notice">Chargement des plans…</div>
+          <div className="plan-tarifs__notice">Chargement des plans…</div>
         ) : (
-          <div className="directory-shops__list">
+          <div className="plan-tarifs__list">
             {activePlans.map((plan) => (
-              <article className="directory-shop-card" key={plan.id}>
-                <div className="directory-shop-card__content">
-                  <h2>{plan.nom_plan}</h2>
-                  <div className="directory-shop-card__details" style={{ gap: 8 }}>
-                    <span>Cible : {plan.type_cible}</span>
-                    <span>Durée : {plan.duree_jours} jours</span>
-                    <span>Prix : {Number(plan.prix).toFixed(2)} €</span>
-                    <span>Priorité : {plan.priorite}</span>
-                    <span>Statut : {plan.statut}</span>
+              <article className="plan-tarif-card" key={plan.id}>
+                <div className="plan-tarif-card__content">
+                  <h2 className="plan-tarif-card__title">{plan.nom_plan}</h2>
+                  <div className="plan-tarif-card__details">
+                    <div className="plan-tarif-card__detail">Cible : {plan.type_cible}</div>
+                    <div className="plan-tarif-card__detail">Durée : {plan.duree_jours} jours</div>
+                    <div className="plan-tarif-card__detail">Prix : {Number(plan.prix).toFixed(2)} €</div>
+                    <div className="plan-tarif-card__detail">Priorité : {plan.priorite}</div>
+                    <div className={`plan-tarif-card__status ${plan.statut === 'inactif' ? 'inactif' : ''}`}>{plan.statut}</div>
                   </div>
-                  <div className="directory-shop-card__meta">
+                  <div className="plan-tarif-card__meta">
                     <small>Modifié par : {plan.modefie_par ?? 'N/A'}</small>
                     <small>Créé : {new Date(plan.date_creation).toLocaleDateString('fr-FR')}</small>
                     <small>Mis à jour : {new Date(plan.date_maj).toLocaleDateString('fr-FR')}</small>
                   </div>
                 </div>
-                <div className="directory-shop-card__actions" style={{ gap: 8 }}>
+                <div className="plan-tarif-card__actions">
                   <button className="btn teal btn-sm" type="button" onClick={() => openEditForm(plan)}>
                     Modifier
                   </button>
-                  <select
-                    value={plan.statut}
-                    onChange={(event) => handleStatutChange(plan, event.target.value)}
-                    disabled={savingId === plan.id}
-                    style={{ minWidth: 130 }}
-                  >
-                    <option value="actif">Actif</option>
-                    <option value="inactif">Inactif</option>
-                  </select>
                 </div>
               </article>
             ))}

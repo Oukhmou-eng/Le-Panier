@@ -1,14 +1,172 @@
-import { Injectable, ForbiddenException } from '@nestjs/common';
-import { CreateCommandeDto } from './dto/create-commande.dto';
+import { Injectable, ForbiddenException, BadRequestException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { randomUUID } from 'crypto';
+import { CarteSimuleeDto, CreateCommandeDto } from './dto/create-commande.dto';
 import { DatabaseService } from '../../database/database.service';
 
 @Injectable()
 export class CommandesService {
   constructor(private readonly db: DatabaseService) {}
 
-  create(dto: CreateCommandeDto) {
-    // TODO: this.prisma.commandes.create({ data: dto })
-    return dto;
+  async create(userId: number, dto: CreateCommandeDto) {
+    // dto can contain: id_adresse OR adresse object, paiement (simulated card info)
+    const connection = await this.db.getPool().getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // load cart items for user
+      const [itemsRows]: any = await connection.query(
+        `SELECT pi.id_panier_item, pi.id_produit, pi.quantite,
+                COALESCE((
+                  SELECT s.prix_promo FROM soldes s
+                  WHERE s.id_produit = p.id_produit AND s.prix_promo < p.prix AND s.statut = 'active'
+                    AND s.date_debut <= NOW() AND s.date_fin >= NOW()
+                  ORDER BY s.id_solde DESC LIMIT 1
+                ), p.prix) AS prix_unitaire,
+                p.stock, p.id_boutique, p.statut
+         FROM panier_items pi
+         JOIN produits p ON p.id_produit = pi.id_produit
+         WHERE pi.id_user = ? AND pi.est_enregistre = 0 FOR UPDATE`,
+        [userId],
+      );
+
+      if (!itemsRows || itemsRows.length === 0) {
+        throw new BadRequestException('Panier vide');
+      }
+
+      for (const item of itemsRows) {
+        const stock = Number(item.stock ?? 0);
+        const quantite = Number(item.quantite);
+        if (!Number.isInteger(quantite) || quantite < 1) {
+          throw new BadRequestException(`Quantité invalide pour le produit ${item.id_produit}`);
+        }
+        if (item.statut !== 'en_ligne' || quantite > stock) {
+          throw new BadRequestException(`Stock insuffisant ou produit indisponible : ${item.id_produit}`);
+        }
+      }
+
+      // handle adresse
+      let adresseId = dto.id_adresse ?? null;
+      if (adresseId) {
+        const [addresses]: any = await connection.query(
+          'SELECT id_adresse FROM adresses WHERE id_adresse = ? AND id_user = ? FOR UPDATE',
+          [adresseId, userId],
+        );
+        if (!addresses.length) throw new BadRequestException('Adresse de livraison introuvable');
+      } else if (dto.adresse) {
+        const addr = dto.adresse;
+        const [res]: any = await connection.query(
+          `INSERT INTO adresses (id_user, libelle, ligne1, ville, code_postal, tele, est_defaut) VALUES (?, ?, ?, ?, ?, ?, 0)`,
+          [userId, addr.libelle?.trim() || null, addr.ligne1.trim(), addr.ville.trim(), addr.code_postal.trim(), addr.tele.trim()],
+        );
+        adresseId = res.insertId;
+      }
+      if (!adresseId) {
+        throw new BadRequestException('Adresse de livraison requise');
+      }
+
+      let sousTotal = 0;
+      for (const item of itemsRows) {
+        const prix = Number(item.prix_unitaire ?? 0);
+        sousTotal += prix * Number(item.quantite);
+      }
+      // Doit rester aligné avec la règle affichée par le panier côté client.
+      const fraisLivraison = sousTotal >= 700 ? 0 : 25;
+      const montantTotal = sousTotal + fraisLivraison;
+      const paiementMoyenId = await this.createSimulatedPaymentMethod(connection, userId, dto.paiement);
+
+      // create commande
+      const [commandeRes]: any = await connection.query(
+        `INSERT INTO commandes (id_user, id_adresse, montant_total) VALUES (?, ?, ?)`,
+        [userId, adresseId, montantTotal],
+      );
+      const commandeId = commandeRes.insertId;
+
+      // create commande_lignes and decrement stock
+      for (const item of itemsRows) {
+        const sousTotal = Number(item.prix_unitaire) * Number(item.quantite);
+        const [stockResult]: any = await connection.query(
+          `UPDATE produits SET stock = stock - ?
+           WHERE id_produit = ? AND statut = 'en_ligne' AND stock >= ?`,
+          [item.quantite, item.id_produit, item.quantite],
+        );
+        if (!stockResult.affectedRows) {
+          throw new BadRequestException(`Stock insuffisant pour le produit ${item.id_produit}`);
+        }
+        await connection.query(
+          `INSERT INTO commande_lignes (id_commande, id_produit, id_boutique, quantite, prix_unitaire, sous_total)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [commandeId, item.id_produit, item.id_boutique, item.quantite, item.prix_unitaire, sousTotal],
+        );
+      }
+
+      // simulate payment
+      const reference = `SIMU-${randomUUID()}`;
+      await connection.query(
+        `INSERT INTO paiements (id_commande, id_moyen_paiement, montant, methode, fournisseur, statut, reference_transaction)
+         VALUES (?, ?, ?, ?, ?, 'valide', ?)`,
+        [commandeId, paiementMoyenId, montantTotal, dto.paiement.methode, dto.paiement.fournisseur ?? (dto.paiement.methode === 'carte' ? 'simulation' : 'livraison'), reference],
+      );
+
+      // remove panier items
+      await connection.query(`DELETE FROM panier_items WHERE id_user = ? AND est_enregistre = 0`, [userId]);
+
+      await connection.commit();
+
+      return {
+        success: true,
+        id_commande: commandeId,
+        reference_transaction: reference,
+        sous_total: sousTotal,
+        frais_livraison: fraisLivraison,
+        montant_total: montantTotal,
+      };
+    } catch (err) {
+      await connection.rollback();
+      if (err && err.message) throw err;
+      throw new InternalServerErrorException('Erreur lors de la création de la commande');
+    } finally {
+      connection.release();
+    }
+  }
+
+  private async createSimulatedPaymentMethod(connection: any, userId: number, paiement: CreateCommandeDto['paiement']) {
+    if (paiement.methode === 'cod') return null;
+
+    const carte = paiement.carte as CarteSimuleeDto;
+    const numero = carte.numero.replace(/[\s-]/g, '');
+    if (!/^\d{13,19}$/.test(numero) || !this.isValidCardNumber(numero)) {
+      throw new BadRequestException('Numéro de carte bancaire invalide');
+    }
+
+    const [month, year] = carte.expiration.split('/').map(Number);
+    const expiration = new Date(2000 + year, month, 0);
+    if (expiration < new Date(new Date().getFullYear(), new Date().getMonth(), 1)) {
+      throw new BadRequestException('Carte bancaire expirée');
+    }
+
+    const token = `sim_${randomUUID()}`;
+    const expirationSql = `${expiration.getFullYear()}-${String(expiration.getMonth() + 1).padStart(2, '0')}-01`;
+    const [result]: any = await connection.query(
+      `INSERT INTO moyens_paiement (id_user, fournisseur, type, jeton_paiement, derniers_chiffres, date_expiration)
+       VALUES (?, ?, 'carte', ?, ?, ?)`,
+      [userId, paiement.fournisseur ?? 'simulation', token, numero.slice(-4), expirationSql],
+    );
+    return result.insertId;
+  }
+
+  private isValidCardNumber(numero: string) {
+    let sum = 0;
+    let shouldDouble = false;
+    for (let index = numero.length - 1; index >= 0; index -= 1) {
+      let digit = Number(numero[index]);
+      if (shouldDouble) {
+        digit *= 2;
+        if (digit > 9) digit -= 9;
+      }
+      sum += digit;
+      shouldDouble = !shouldDouble;
+    }
+    return sum % 10 === 0;
   }
 
   async getStatistics(
@@ -250,19 +408,27 @@ export class CommandesService {
     return { id };
   }
 
-  async update(id: number, dto: Partial<CreateCommandeDto> & { statut?: string }) {
+  async updateStatusForBoutique(id: number, userId: number, statut?: string) {
     const allowedStatuses = ['en_attente', 'confirmee', 'expediee', 'livree', 'annulee', 'remboursee'];
-    const statut = dto.statut;
-
-    if (statut && !allowedStatuses.includes(statut)) {
-      throw new Error('Statut invalide.');
+    if (!statut || !allowedStatuses.includes(statut)) {
+      throw new BadRequestException('Statut invalide.');
     }
 
-    if (statut) {
-      await this.db.query('UPDATE commandes SET statut = ? WHERE id_commande = ?', [statut, id]);
+    const ownedOrder = await this.db.query<any[]>(
+      `SELECT c.id_commande
+       FROM commandes c
+       INNER JOIN commande_lignes cl ON cl.id_commande = c.id_commande
+       INNER JOIN boutiques b ON b.id_boutique = cl.id_boutique
+       WHERE c.id_commande = ? AND b.id_user = ?
+       LIMIT 1`,
+      [id, userId],
+    );
+    if (!ownedOrder.length) {
+      throw new NotFoundException('Commande introuvable pour votre boutique.');
     }
 
-    return { id, ...dto };
+    await this.db.query('UPDATE commandes SET statut = ? WHERE id_commande = ?', [statut, id]);
+    return { id_commande: id, statut };
   }
 
   remove(id: number) {

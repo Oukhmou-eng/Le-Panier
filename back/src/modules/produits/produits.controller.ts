@@ -59,7 +59,24 @@ findSimilarProducts(
     return this.produitsService.getMesProduits(+id);
   }
 
-@Get(':id/avis')
+  @UseGuards(JwtAuthGuard)
+  @Post('signale')
+  signaler(@Body() body: any, @CurrentUser() user: { id_user: number }) {
+    return this.produitsService.signaler(body.id, body.motif, body.description, user.id_user);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/signale')
+  signalerParId(
+    @Param('id') id: string,
+    @Body('motif') motif: string,
+    @Body('description') description: string,
+    @CurrentUser() user: { id_user: number },
+  ) {
+    return this.produitsService.signaler(+id, motif, description, user.id_user);
+  }
+
+  @Get(':id/avis')
   getAvis(@Param('id') id: number) {
     return this.produitsService.getAvis(id);
   }

@@ -1,6 +1,7 @@
 import{ useState } from 'react';
 import "../../css/Registre.css";
 import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 
 
@@ -15,7 +16,12 @@ function Registre() {
     const [termsAccepted, setTermsAccepted] = useState(false);  
     const [error, setError] = useState(""); 
     const [msg, setMsg] = useState(""); 
+      const navigate = useNavigate();
     
+const log = ()=>{
+
+    navigate('/login');
+  }
 
     const handleRegister = async () => {
 
@@ -45,7 +51,7 @@ function Registre() {
         return;
       }
         setMsg(data.message) ; 
-      console.log('Registration successful:', data);
+      console.log('Registration successful:', data); navigate('/login');
     } catch (error) {
       console.error('An error occurred during registration.', error);
     } finally {
@@ -54,10 +60,7 @@ function Registre() {
 
   }
  
-  const log = ()=>{
-
-    navigate('/login');
-  }
+  
    
    
     return (

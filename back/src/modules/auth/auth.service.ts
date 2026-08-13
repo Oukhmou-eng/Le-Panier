@@ -95,12 +95,12 @@ export class AuthService {
         );
     }
 
-    const payload = {
-        sub: user.id_user,
-        email: user.email,
-        
-        
-    };
+    const status = String(user.statut || user.status || '').toLowerCase();
+    if (status === 'suspendu' || status === 'suspended') {
+      throw new UnauthorizedException(
+        'Compte suspendu. Vous ne pouvez pas vous connecter.'
+      );
+    }
 
     const [boutiqueInfo] = (await this.db.query<any[]>(
       'SELECT id_boutique FROM boutiques WHERE id_user = ? LIMIT 1',

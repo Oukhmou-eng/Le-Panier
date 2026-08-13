@@ -95,3 +95,17 @@ export async function restoreFromSaved(id) {
   }
   return data;
 }
+
+export async function placeOrder(payload) {
+  const response = await fetch(`${API_URL}/commandes`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+    body: JSON.stringify(payload),
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    const message = Array.isArray(data?.message) ? data.message.join(' ') : data?.message;
+    throw new Error(message || 'Impossible de passer la commande.');
+  }
+  return data;
+}

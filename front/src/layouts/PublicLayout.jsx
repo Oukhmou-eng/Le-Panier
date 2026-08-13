@@ -1,6 +1,7 @@
 import "../css/PublicLayout.css";
-import { useState, useEffect } from "react";
-import { Link, useNavigate, useLocation } from 'react-router-dom'
+import "../css/Dialogue.css";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useNavigate, useLocation } from 'react-router-dom'
 
 function PublicLayout() {
   const [search, setSearch] = useState("");
@@ -9,6 +10,7 @@ function PublicLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [btnq, setBtnq] = useState(false);
+  const [authDialogDestination, setAuthDialogDestination] = useState(null);
 
   const IconMenu = () => (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -81,6 +83,7 @@ function PublicLayout() {
   const [avatarUrl, setAvatarUrl] = useState("");
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [boutiques, setBoutiques] = useState([]);
+  const userMenuRef = useRef(null);
 
   useEffect(() => {
     const currentToken = localStorage.getItem('token');
@@ -96,6 +99,7 @@ function PublicLayout() {
     setNom(localStorage.getItem('nom') || "");
     setPrenom(localStorage.getItem('prenom') || "");
     setAvatarUrl(localStorage.getItem('avatar') || "");
+    setShowUserDropdown(false);
   }, [location.pathname]);
 
 
@@ -121,8 +125,20 @@ function PublicLayout() {
     };
     fetchMesBoutiques();
   }, [location.pathname]);
-  const boutiquesAffichees = boutiques.slice(0, 2);
   const initiales = `${prenom.charAt(0)}${nom.charAt(0)}`.toUpperCase() || '?';
+
+  useEffect(() => {
+    if (!showUserDropdown) return undefined;
+
+    const fermerMenuUtilisateur = (event) => {
+      if (!userMenuRef.current?.contains(event.target)) {
+        setShowUserDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', fermerMenuUtilisateur);
+    return () => document.removeEventListener('mousedown', fermerMenuUtilisateur);
+  }, [showUserDropdown]);
 
   const deconnecter = () => {
     localStorage.removeItem('token');
@@ -157,11 +173,13 @@ const handleShowList = () => {
 
     return items
       .map((item) => {
-        if (typeof item === "string") return item.trim();
+        if (typeof item === "string") return { id: item.trim(), label: item.trim() };
         if (item && typeof item === "object") {
-          return item.nom || item.name || item.label || "";
+          const label = item.nom || item.name || item.label || "";
+          const id = item.id_categorie ?? item.id ?? item.slug ?? label;
+          return label ? { id: String(id), label } : null;
         }
-        return "";
+        return null;
       })
       .filter(Boolean);
   };
@@ -178,7 +196,32 @@ const handleCat = async () => {
   }
 
 useEffect(() => {  handleCat(); }, []);
-  const limiteAtteinte = boutiques.length >= 2;
+
+  const goToCatalogue = useCallback((params = {}) => {
+    const query = new URLSearchParams();
+    if (params.search?.trim()) query.set("search", params.search.trim());
+    if (params.category) query.set("category", String(params.category));
+    setShowList(false);
+    navigate(`/catalogue${query.toString() ? `?${query.toString()}` : ""}`);
+  }, [navigate]);
+
+  const handleSearchSubmit = () => goToCatalogue({ search });
+
+  const navigateToProtectedPage = (destination) => {
+    if (!localStorage.getItem("token")) {
+      setAuthDialogDestination(destination);
+      return;
+    }
+    navigate(destination);
+  };
+
+  useEffect(() => {
+    const query = search.trim();
+    if (!query) return undefined;
+
+    const timer = setTimeout(() => goToCatalogue({ search: query }), 300);
+    return () => clearTimeout(timer);
+  }, [search, goToCatalogue]);
 
 
   return (
@@ -194,9 +237,9 @@ useEffect(() => {  handleCat(); }, []);
             <span className="hamburger"><IconMenu /></span> Catégories
           </button>
           <div className={`cats-dropdown ${showList ? "open" : ""}`}>
-            {normalizeCategories(categories).map((category, index) => (
-              <button key={`${category}-${index}`}>
-                {category}
+            {normalizeCategories(categories).map((category) => (
+              <button key={category.id} onClick={() => goToCatalogue({ category: category.id })}>
+                {category.label}
               </button>
             ))}
           </div>
@@ -209,9 +252,12 @@ useEffect(() => {  handleCat(); }, []);
         placeholder="Rechercher un produit, une boutique…"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") handleSearchSubmit();
+        }}
       />
 
-      <button onClick={() => console.log(search)}>
+      <button type="button" onClick={handleSearchSubmit} aria-label="Rechercher">
         <IconSearch />
       </button>
 
@@ -247,16 +293,20 @@ useEffect(() => {  handleCat(); }, []);
               >
                 <IconBell />
               </button>
-              <div className="header-user-wrap" id="headerUserMenu">
+              <div className="header-user-wrap" id="headerUserMenu" ref={userMenuRef}>
                 <button
+                  type="button"
                   className="header-user-btn"
                   id="headerUserBtn"
-                  onClick={() => setShowUserDropdown(!showUserDropdown)}
+                  onClick={() => setShowUserDropdown((isOpen) => !isOpen)}
+                  aria-expanded={showUserDropdown}
+                  aria-controls="headerUserDropdown"
+                  aria-label={`Menu du compte de ${prenom} ${nom}`.trim() || 'Menu du compte'}
                 >
                   <span className="hu-ava">
                     {avatarUrl ? <img src={avatarUrl} alt="" /> : initiales}
                   </span>
-                  <span className="hu-name">{prenom}</span>
+                  <span className="hu-name" aria-hidden="true">{initiales}</span>
                 </button>
 
                 <div className={`header-user-dropdown ${showUserDropdown ? "open" : ""}`} id="headerUserDropdown">
@@ -315,7 +365,7 @@ useEffect(() => {  handleCat(); }, []);
             className="rail-icon-btn"
             title="Favoris"
             data-page="compte/favoris.html"
-            onClick={() => {navigate('/favoris');} }
+            onClick={() => navigateToProtectedPage("/favoris")}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M20.84 4.61c-1.54-1.34-3.88-1.35-5.44-.04L12 5.63l-3.4-3.06c-1.56-1.31-3.9-1.3-5.44.04-1.7 1.48-1.8 4.11-.23 5.7l8.04 8.21c.37.38.86.59 1.38.59.52 0 1.01-.21 1.38-.59l8.04-8.21c1.57-1.59 1.47-4.22-.23-5.7z" />
@@ -326,7 +376,7 @@ useEffect(() => {  handleCat(); }, []);
             className="rail-icon-btn"
             data-page="panier.html"
             title="Panier"
-            onClick={() => navigate("/panier")}
+            onClick={() => navigateToProtectedPage("/panier")}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <circle cx="9" cy="21" r="1" />
@@ -346,10 +396,31 @@ useEffect(() => {  handleCat(); }, []);
           <button data-page="support.html">Aide</button>
         </div>
       </div>
+      {authDialogDestination && (
+        <div className="dialog-overlay" onClick={() => setAuthDialogDestination(null)}>
+          <div className="dialog-box" onClick={(event) => event.stopPropagation()}>
+            <h3>Connexion requise</h3>
+            <p>Vous devez être connecté pour accéder à cette section. Voulez-vous vous connecter ?</p>
+            <div className="dialog-actions">
+              <button type="button" className="btn-secondary" onClick={() => setAuthDialogDestination(null)}>
+                Annuler
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => {
+                  setAuthDialogDestination(null);
+                  navigate("/login");
+                }}
+              >
+                Se connecter
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </nav>
   );
 }
 
 export default PublicLayout;
-
-

@@ -1,6 +1,7 @@
 import "../../css/Boutique.css";
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
+import ReportModal from "../../components/ReportModal";
 
 function Boutique(){
 
@@ -30,6 +31,8 @@ const [commentaire, setCommentaire] = useState("");
   const [avis, setAvis] = useState([]);
   const [motif, setMotif] = useState("");
   const [description, setDescription] = useState(""); 
+  const [reportStatus, setReportStatus] = useState("");
+  const [reportError, setReportError] = useState("");
 
   const [isFollowed, setIsFollowed] = useState(false); // état initial selon vos données
 const [errorr, setErrorr] = useState(null);
@@ -182,23 +185,30 @@ if (!token) {
 
  const SignalerBoutique = async () => {
       try {
+        setReportStatus("");
+        setReportError("");
         const res = await fetch("http://localhost:3000/boutiques/signale", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ id, motif, description}),
-          
+          body: JSON.stringify({ id, motif, description }),
         });
-        console.log("id:", id, "motif:", motif, "description:", description);
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data?.message || "Impossible d'envoyer le signalement.");
+        }
 
+        setReportStatus(data?.message || "Signalement envoyé avec succès.");
+        setReportError("");
+        setMotif("");
+        setDescription("");
+        fermerModal();
       } catch (error) {
         console.error(error);
+        setReportError(error.message || "Une erreur est survenue pendant le signalement.");
       }
     };
-
-
-
 
   // URLs banniere/logo venant des données de la boutique renvoyées par le backend
   const bannerUrl = boutique?.banniere_url || "";
@@ -240,6 +250,8 @@ if (!token) {
       setModalOpen(true);
       setAfficherTousProduits(false);
       setModalAvis(false);
+      setReportStatus("");
+      setReportError("");
    
   }
   const ouvrirModalAvis = () => {
@@ -268,37 +280,86 @@ if (!token) {
     style={bannerExists ? { backgroundImage: `url(${bannerUrl})` } : undefined}
   ></div>
   <div className="shop-head">
+    
+
     <div
       className={`shop-logo ${logoExists ? '' : 'no-logo'}`}
       id="shopLogo"
-      style={logoExists ? { backgroundImage: `url(${logoUrl})` } : undefined}
-    ></div>
+    >
+      {logoExists && <img src={logoUrl} alt={`Logo de ${boutique?.nom ?? "la boutique"}`} />}
+    </div>
     <div className="shop-meta">
       <h1>{boutique?.nom}</h1>
       <div className="stars">
         ★★★★★ {boutique?.note_moyenne}{boutique?.estVerifier ? ' · Vendeur vérifié' : ''}
       </div>
     </div>
-
-
-<button
-                  className={`directory-shop-card__follow ${isFollowed ? "is-followed" : ""}`}
-                  onClick={() => toggleFollow(Number(id))}
-                  aria-pressed={isFollowed}
-                >
-                  {isFollowed ? "✓ Suivie" : "+ Suivre"}
-                </button>
+    <div className="shop-head-actions">
+      <button
+        className={`btn-follow ${isFollowed ? 'following' : ''}`}
+        onClick={() => toggleFollow(Number(id))}
+        aria-pressed={isFollowed}
+      >
+        {isFollowed ? '✓ Suivie' : '+ Suivre'}
+      </button>
       <AuthDialog
-          isOpen={showAuthDialog}
-          onConfirm={() => {
-            setShowAuthDialog(false);
-            navigate('/login');
-          }}
-          onCancel={() => setShowAuthDialog(false)}
+        isOpen={showAuthDialog}
+        onConfirm={() => {
+          setShowAuthDialog(false);
+          navigate('/login');
+        }}
+        onCancel={() => setShowAuthDialog(false)}
       />
-
-    
+    </div>
   </div>
+
+  {(boutique?.adresse || boutique?.tele || boutique?.emailprof || boutique?.instagram || boutique?.facebook) && (
+    <div className="shop-info-panel">
+      {boutique?.adresse && (
+        <div className="shop-info-card">
+          <span>Adresse</span>
+          <strong>{boutique.adresse}</strong>
+        </div>
+      )}
+      {boutique?.tele && (
+        <div className="shop-info-card">
+          <span>Téléphone</span>
+          <strong>{boutique.tele}</strong>
+        </div>
+      )}
+      {boutique?.emailprof && (
+        <div className="shop-info-card">
+          <span>Email</span>
+          <strong>{boutique.emailprof}</strong>
+        </div>
+      )}
+      {(boutique?.instagram || boutique?.facebook) && (
+        <div className="shop-info-card shop-info-social">
+          <span>Réseaux</span>
+          <div className="shop-social">
+            {boutique.instagram && (
+              <a
+                href={boutique.instagram.startsWith('http') ? boutique.instagram : `https://www.instagram.com/${boutique.instagram.replace(/^@/, '')}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Instagram
+              </a>
+            )}
+            {boutique.facebook && (
+              <a
+                href={boutique.facebook.startsWith('http') ? boutique.facebook : `https://www.facebook.com/${boutique.facebook.replace(/^@/, '')}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Facebook
+              </a>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )}
 
   <div className="shop-stats">
     <div>{produits.length}<span>Produits</span></div>
@@ -524,38 +585,18 @@ if (!token) {
 
 </main>
 
-<> {modalOpen && (
-
-<div className="modal-card">
-    <h3>Signaler cette boutique</h3>
-    <div style={{ textAlign: "right" }}>
-  <button onClick={fermerModal}>
-    <i className="fas fa-times"></i>X
-  </button>
-</div>
-    <p className="hint">Merci de nous indiquer la raison. Notre équipe examinera votre signalement rapidement.</p>
-
-    <label className="report-reason"> <input type="radio" name="reportReason" value="contrefacon"  onChange={(e) => setMotif(e.target.value)}  /> Produits contrefaits ou non conformes</label>
-    <label className="report-reason"><input type="radio" name="reportReason" value="arnaque"  onChange={(e) => setMotif(e.target.value)}/> Comportement suspect / arnaque</label>
-    <label className="report-reason"><input type="radio" name="reportReason" value="contenu"  onChange={(e) => setMotif(e.target.value)}/> Contenu inapproprié</label>
-    <label className="report-reason"><input type="radio" name="reportReason" value="autre"  onChange={(e) => setMotif(e.target.value)}/> Autre raison</label>
-
-    <div className="field" style={{ marginTop: '12px' }}>
-      <label>Précisez (facultatif)</label>
-      <textarea id="reportDetails" placeholder="Ajoutez des détails…"  value={description} onChange={(e) => setDescription(e.target.value)} style={{ minHeight: '70px' }}></textarea>
-    </div>
-
-    <div className="modal-actions">
-      <button className="btn outline" id="closeReportBtn" onClick={fermerModal}>
-        Annuler
-      </button>
-      <button className="btn danger-outline" id="submitReportBtn" onClick={() => { SignalerBoutique(); fermerModal(); }}>
-        Envoyer le signalement
-      </button>
-    </div>
-      </div>
-
-)}</>
+      <ReportModal
+        isOpen={modalOpen}
+        onClose={fermerModal}
+        title="Signaler cette boutique"
+        motif={motif}
+        description={description}
+        setMotif={setMotif}
+        setDescription={setDescription}
+        onSubmit={SignalerBoutique}
+        statusMessage={reportStatus}
+        errorMessage={reportError}
+      />
 
     </>
 

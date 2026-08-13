@@ -17,6 +17,7 @@ import Produit from './pages/public/Produit'
 import Panier from './pages/public/Panier'
 import Comptelayout from './layouts/Comptelayout'
 import VendeurSidebar from './layouts/VendeurLayout'
+import AdminSidebar from './layouts/Adminlayout'
 
 import Messages from './pages/compte/Messages'
 import MessagesVendeur from './pages/vendeur/MessagesVendeur'
@@ -34,8 +35,13 @@ import Parametres from './pages/compte/Parametres'
 import ParametresVendeur from './pages/vendeur/ParametresVendeur'
 import Statistiques from './pages/vendeur/Statistiques'
 import AdminBoutiques from './pages/admin/Boutiques'
+import AdminDashboard from './pages/admin/Dashboard'
 import AdminUsers from './pages/admin/Users'
 import AdminPlanTarifs from './pages/admin/PlanTarifs'
+import AdminSignalements from './pages/admin/Signalements'
+import AdminCategories from './pages/admin/Categories'
+import FacturesBoutiques from './pages/admin/FacturesBoutiques'
+
 
 function App() {
   const token = localStorage.getItem('token');
@@ -67,24 +73,36 @@ function App() {
         
 
        
-        <Route path="/mes-produits" element={<><Navbar/><VendeurSidebar/><MesProduits/></>} />
-        <Route path="/publicites" element={<><Navbar/><VendeurSidebar/><Publicites/></>} />
-        <Route path="/publierProduit" element={<><Navbar/><VendeurSidebar/><PublierProduit/></>} />
-        <Route path="/publierProduit/:id" element={<><Navbar/><VendeurSidebar/><PublierProduit/></>} />
-        <Route path="/avis-clients" element={<><Navbar/><AvisClients/></>} />
+        <Route path="/mes-produits" element={<><Navbar/><div className="app-connected active"><VendeurSidebar/><MesProduits/></div></>} />
+        <Route path="/publicites" element={<><Navbar/><div className="app-connected active"><VendeurSidebar/><Publicites/></div></>} />
+        <Route path="/publierProduit" element={<><Navbar/><div className="app-connected active"><VendeurSidebar/><PublierProduit/></div></>} />
+        <Route path="/publierProduit/:id" element={<><Navbar/><div className="app-connected active"><VendeurSidebar/><PublierProduit/></div></>} />
+        <Route path="/avis-clients" element={<><Navbar/><div className="app-connected active"><VendeurSidebar/><AvisClients/></div></>} />
         <Route path="/messages" element={<><Navbar/><Messages/></>} />
-        <Route path="/messages-vendeur" element={<><Navbar/><VendeurSidebar/><MessagesVendeur/></>} />
-        <Route path="/commandes-recues" element={<><Navbar/><CammandesRecues/></>} />
-        <Route path="/statistiques" element={<><Navbar/><Statistiques/></>} />
-        <Route path="/parametres-vendeur" element={<><Navbar/><VendeurSidebar/><ParametresVendeur/></>} />
+        <Route path="/messages-vendeur" element={<><Navbar/><div className="app-connected active"><VendeurSidebar/><MessagesVendeur/></div></>} />
+        <Route path="/commandes-recues" element={<><Navbar/><div className="app-connected active"><VendeurSidebar/><CammandesRecues/></div></>} />
+        <Route path="/statistiques" element={<><Navbar/><div className="app-connected active"><VendeurSidebar/><Statistiques/></div></>} />
+        <Route path="/parametres-vendeur" element={<><Navbar/><div className="app-connected active"><VendeurSidebar/><ParametresVendeur/></div></>} />
+        <Route path="/admin/dashboard" element={
+          token ? <><Navbar/><div className="app-connected active"><AdminSidebar/><AdminDashboard/></div></> : <Navigate to="/login" />
+        } />
         <Route path="/admin/boutiques" element={
-          token ? <><Navbar/><AdminBoutiques/></> : <Navigate to="/login" />
+          token ? <><Navbar/><div className="app-connected active"><AdminSidebar/><AdminBoutiques/></div></> : <Navigate to="/login" />
         } />
         <Route path="/admin/users" element={
-          token ? <><Navbar/><AdminUsers/></> : <Navigate to="/login" />
+          token ? <><Navbar/><div className="app-connected active"><AdminSidebar/><AdminUsers/></div></> : <Navigate to="/login" />
         } />
         <Route path="/admin/plans" element={
-          token ? <><Navbar/><AdminPlanTarifs/></> : <Navigate to="/login" />
+          token ? <><Navbar/><div className="app-connected active"><AdminSidebar/><AdminPlanTarifs/></div></> : <Navigate to="/login" />
+        } />
+        <Route path="/admin/categories" element={
+          token ? <><Navbar/><div className="app-connected active"><AdminSidebar/><AdminCategories/></div></> : <Navigate to="/login" />
+        } />
+        <Route path="/admin/factures" element={
+          token ? <><Navbar/><div className="app-connected active"><AdminSidebar/><FacturesBoutiques/></div></> : <Navigate to="/login" />
+        } />
+        <Route path="/admin/signalements" element={
+          token ? <><Navbar/><div className="app-connected active"><AdminSidebar/><AdminSignalements/></div></> : <Navigate to="/login" />
         } />
 
        <Route path="/espConnecter" element={

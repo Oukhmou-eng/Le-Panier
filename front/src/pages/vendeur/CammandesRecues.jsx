@@ -37,7 +37,10 @@ function CammandesRecues() {
       const res = await fetch(`${API_URL}/commandes/boutique/${boutiqueId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) throw new Error(`Erreur HTTP ${res.status}`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.message || `Erreur HTTP ${res.status}`);
+      }
       const data = await res.json();
       setOrders(data?.commandes ?? []);
     } catch (err) {
@@ -76,11 +79,14 @@ function CammandesRecues() {
         },
         body: JSON.stringify({ statut: newStatus }),
       });
-      if (!res.ok) throw new Error(`Erreur HTTP ${res.status}`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.message || `Erreur HTTP ${res.status}`);
+      }
       setOrders((current) => current.map((order) => order.id_commande === orderId ? { ...order, statut: newStatus } : order));
     } catch (err) {
       console.error(err);
-      setError('La mise à jour du statut a échoué.');
+      setError(err.message || 'La mise à jour du statut a échoué.');
     } finally {
       setUpdatingId(null);
     }
@@ -172,7 +178,17 @@ function CammandesRecues() {
                     </td>
                     <td className="amount-cell">{Number(order.montant_total || 0).toLocaleString('fr-MA')} MAD</td>
                     <td>
-                      <button type="button" className="details-button">Détails</button>
+                      <select
+                        className="status-select"
+                        aria-label={`Modifier le statut de la commande ${order.id_commande}`}
+                        value={order.statut || 'en_attente'}
+                        disabled={updatingId === order.id_commande}
+                        onChange={(event) => handleStatusChange(order.id_commande, event.target.value)}
+                      >
+                        {STATUS_OPTIONS.map((status) => (
+                          <option key={status.value} value={status.value}>{status.label}</option>
+                        ))}
+                      </select>
                     </td>
                   </tr>
                 );
