@@ -1,112 +1,132 @@
-﻿import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import type { RowDataPacket } from 'mysql2';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import { PrismaService } from '../../database/prisma.service';
 import { CreatePanierItemDto } from './dto/create-panier-item.dto';
-import { DatabaseService } from '../../database/database.service';
 
 @Injectable()
 export class PanierService {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  private readonly cartItemSelect = `
-    SELECT pi.id_panier_item AS id, pi.id_user, pi.id_produit, pi.quantite,
-      p.nom, p.prix, p.stock, p.id_boutique, b.nom AS boutique_nom,
-      b.logo_url AS boutique_logo_url, pm.url AS image_url,
-      s.type_reduction, s.valeur_reduction, s.prix_promo, s.date_debut, s.date_fin
-    FROM panier_items pi
-    INNER JOIN produits p ON p.id_produit = pi.id_produit
-    INNER JOIN boutiques b ON b.id_boutique = p.id_boutique
-    LEFT JOIN soldes s ON s.id_produit = p.id_produit
-      AND s.statut = 'active'
-      AND s.date_debut <= NOW()
-      AND s.date_fin >= NOW()
-    LEFT JOIN produit_medias pm ON pm.id_media = (
-      SELECT pm2.id_media FROM produit_medias pm2
-      WHERE pm2.id_produit = p.id_produit
-      ORDER BY pm2.ordre ASC, pm2.id_media ASC LIMIT 1
-    )`;
+  private productInclude(now: Date): Prisma.panier_itemsInclude {
+    return {
+      produits: {
+        include: {
+          boutiques: { select: { nom: true, logo_url: true } },
+          produit_medias: { orderBy: [{ ordre: 'asc' }, { id_media: 'asc' }], take: 1 },
+          soldes: {
+            where: { statut: 'active', date_debut: { lte: now }, date_fin: { gte: now } },
+            orderBy: [{ date_creation: 'desc' }, { id_solde: 'desc' }],
+            take: 1,
+          },
+        },
+      },
+    };
+  }
+
+  private formatItems(items: any[]) {
+    return items.map(({ produits: produit, ...item }) => {
+      const solde = produit.soldes[0];
+      return {
+        id: item.id_panier_item,
+        id_user: item.id_user,
+        id_produit: item.id_produit,
+        quantite: item.quantite,
+        nom: produit.nom,
+        prix: produit.prix,
+        stock: produit.stock,
+        id_boutique: produit.id_boutique,
+        boutique_nom: produit.boutiques.nom,
+        boutique_logo_url: produit.boutiques.logo_url,
+        image_url: produit.produit_medias[0]?.url ?? null,
+        type_reduction: solde?.type_reduction ?? null,
+        valeur_reduction: solde?.valeur_reduction ?? null,
+        prix_promo: solde?.prix_promo ?? null,
+        date_debut: solde?.date_debut ?? null,
+        date_fin: solde?.date_fin ?? null,
+        variante: '',
+      };
+    });
+  }
 
   async findByUser(userId: number) {
-    const items = await this.db.query<RowDataPacket[]>(
-      `${this.cartItemSelect} WHERE pi.id_user = ? AND pi.est_enregistre = 0 ORDER BY pi.date_ajout DESC`,
-      [userId],
-    );
-    return { items: items.map((item) => ({ ...item, variante: '' })) };
+    const items = await this.prisma.panier_items.findMany({
+      where: { id_user: userId, est_enregistre: false },
+      orderBy: { date_ajout: 'desc' },
+      include: this.productInclude(new Date()),
+    });
+    return { items: this.formatItems(items) };
   }
 
   async findSavedByUser(userId: number) {
-    const items = await this.db.query<RowDataPacket[]>(
-      `${this.cartItemSelect} WHERE pi.id_user = ? AND pi.est_enregistre = 1 ORDER BY pi.date_ajout DESC`,
-      [userId],
-    );
-    return { items: items.map((item) => ({ ...item, variante: '' })) };
+    const items = await this.prisma.panier_items.findMany({
+      where: { id_user: userId, est_enregistre: true },
+      orderBy: { date_ajout: 'desc' },
+      include: this.productInclude(new Date()),
+    });
+    return { items: this.formatItems(items) };
   }
 
   async create(dto: CreatePanierItemDto) {
-    const products = await this.db.query<RowDataPacket[]>(
-      `SELECT stock FROM produits WHERE id_produit = ? AND statut = 'en_ligne' LIMIT 1`,
-      [dto.id_produit],
-    );
-    if (!products.length) throw new NotFoundException('Produit introuvable ou indisponible');
+    const product = await this.prisma.produits.findFirst({
+      where: { id_produit: dto.id_produit, statut: 'en_ligne' },
+      select: { stock: true },
+    });
+    if (!product) throw new NotFoundException('Produit introuvable ou indisponible');
 
-    const existing = await this.db.query<RowDataPacket[]>(
-      `SELECT id_panier_item, quantite FROM panier_items WHERE id_user = ? AND id_produit = ? LIMIT 1`,
-      [dto.id_user, dto.id_produit],
-    );
-    const quantity = (existing[0]?.quantite ?? 0) + dto.quantite;
-    this.ensureStock(quantity, products[0].stock);
+    const existing = await this.prisma.panier_items.findUnique({
+      where: { id_user_id_produit: { id_user: dto.id_user, id_produit: dto.id_produit } },
+    });
+    const quantite = (existing?.quantite ?? 0) + dto.quantite;
+    this.ensureStock(quantite, product.stock);
 
-    if (existing.length) {
-      await this.db.query(
-        `UPDATE panier_items SET quantite = ?, est_enregistre = 0 WHERE id_panier_item = ?`,
-        [quantity, existing[0].id_panier_item],
-      );
-      return { success: true, created: false, id_panier_item: existing[0].id_panier_item, quantite: quantity };
+    if (existing) {
+      await this.prisma.panier_items.update({
+        where: { id_panier_item: existing.id_panier_item },
+        data: { quantite, est_enregistre: false },
+      });
+      return { success: true, created: false, id_panier_item: existing.id_panier_item, quantite };
     }
 
-    const result: any = await this.db.query(
-      `INSERT INTO panier_items (id_user, id_produit, quantite) VALUES (?, ?, ?)`,
-      [dto.id_user, dto.id_produit, dto.quantite],
-    );
-    return { success: true, created: true, id_panier_item: result.insertId, quantite: dto.quantite };
+    const item = await this.prisma.panier_items.create({
+      data: { id_user: dto.id_user, id_produit: dto.id_produit, quantite: dto.quantite },
+    });
+    return { success: true, created: true, id_panier_item: item.id_panier_item, quantite: item.quantite };
   }
 
   async updateQuantity(id: number, userId: number, quantite: number) {
-    const items = await this.db.query<RowDataPacket[]>(
-      `SELECT pi.id_panier_item, p.stock FROM panier_items pi
-       INNER JOIN produits p ON p.id_produit = pi.id_produit
-       WHERE pi.id_panier_item = ? AND pi.id_user = ? AND pi.est_enregistre = 0 LIMIT 1`,
-      [id, userId],
-    );
-    if (!items.length) throw new NotFoundException('Article du panier introuvable');
-    this.ensureStock(quantite, items[0].stock);
-    await this.db.query(`UPDATE panier_items SET quantite = ? WHERE id_panier_item = ? AND id_user = ?`, [quantite, id, userId]);
+    const item = await this.prisma.panier_items.findFirst({
+      where: { id_panier_item: id, id_user: userId, est_enregistre: false },
+      include: { produits: { select: { stock: true } } },
+    });
+    if (!item) throw new NotFoundException('Article du panier introuvable');
+    this.ensureStock(quantite, item.produits.stock);
+    await this.prisma.panier_items.update({ where: { id_panier_item: id }, data: { quantite } });
     return { success: true, id_panier_item: id, quantite };
   }
 
   async remove(id: number, userId: number) {
-    const result: any = await this.db.query(`DELETE FROM panier_items WHERE id_panier_item = ? AND id_user = ?`, [id, userId]);
-    if (!result.affectedRows) throw new NotFoundException('Article du panier introuvable');
+    const result = await this.prisma.panier_items.deleteMany({ where: { id_panier_item: id, id_user: userId } });
+    if (!result.count) throw new NotFoundException('Article du panier introuvable');
     return { success: true, deleted: true };
   }
 
   async saveForLater(id: number, userId: number) {
-    const result: any = await this.db.query(
-      `UPDATE panier_items SET est_enregistre = 1 WHERE id_panier_item = ? AND id_user = ? AND est_enregistre = 0`,
-      [id, userId],
-    );
-    if (!result.affectedRows) throw new NotFoundException('Article du panier introuvable');
+    const result = await this.prisma.panier_items.updateMany({
+      where: { id_panier_item: id, id_user: userId, est_enregistre: false },
+      data: { est_enregistre: true },
+    });
+    if (!result.count) throw new NotFoundException('Article du panier introuvable');
     return { success: true };
   }
 
   async restoreFromSaved(id: number, userId: number) {
-    const items = await this.db.query<RowDataPacket[]>(
-      `SELECT pi.quantite, p.stock FROM panier_items pi INNER JOIN produits p ON p.id_produit = pi.id_produit
-       WHERE pi.id_panier_item = ? AND pi.id_user = ? AND pi.est_enregistre = 1 LIMIT 1`,
-      [id, userId],
-    );
-    if (!items.length) throw new NotFoundException('Article enregistré introuvable');
-    this.ensureStock(items[0].quantite, items[0].stock);
-    await this.db.query(`UPDATE panier_items SET est_enregistre = 0 WHERE id_panier_item = ? AND id_user = ?`, [id, userId]);
+    const item = await this.prisma.panier_items.findFirst({
+      where: { id_panier_item: id, id_user: userId, est_enregistre: true },
+      include: { produits: { select: { stock: true } } },
+    });
+    if (!item) throw new NotFoundException('Article enregistré introuvable');
+    this.ensureStock(item.quantite, item.produits.stock);
+    await this.prisma.panier_items.update({ where: { id_panier_item: id }, data: { est_enregistre: false } });
     return { success: true };
   }
 

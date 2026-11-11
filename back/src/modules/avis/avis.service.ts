@@ -1,40 +1,42 @@
 ﻿import { Injectable } from '@nestjs/common';
-import { DatabaseService } from '../../database/database.service';
+import { PrismaService } from '../../database/prisma.service';
 import { CreateAvisDto } from './dto/create-avis.dto';
 
 @Injectable()
 export class AvisService {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async create(type_cible: string, id_cible: number, note: number, commentaire: string, id_user: number) {
-    const res = await this.db.query<any>(
-      'INSERT INTO avis (id_cible, id_user, type_cible, note, commentaire, date_creation) VALUES (?, ?, ?, ?, ?, NOW())',
-      [id_cible, id_user, type_cible, note, commentaire],
-    );
+    const avis = await this.prisma.avis.create({
+      data: { id_cible, id_user, type_cible: type_cible as 'produit' | 'boutique', note, commentaire },
+    });
 
     return {
       success: true,
-      insertId: res.insertId,
+      insertId: avis.id_avis,
     };
   }
 
   findAll() {
-    // TODO: this.prisma.avis.findMany()
-    return [];
+    return this.prisma.avis.findMany({ orderBy: { date_creation: 'desc' } });
   }
 
   findOne(id: number) {
-    // TODO: this.prisma.avis.findUnique({ where: { id } })
-    return { id };
+    return this.prisma.avis.findUnique({ where: { id_avis: id } });
   }
 
   update(id: number, dto: Partial<CreateAvisDto>) {
-    // TODO: this.prisma.avis.update({ where: { id }, data: dto })
-    return { id, ...dto };
+    return this.prisma.avis.update({
+      where: { id_avis: id },
+      data: {
+        ...(dto.note !== undefined && { note: dto.note }),
+        ...(dto.commentaire !== undefined && { commentaire: dto.commentaire }),
+      },
+    });
   }
 
-  remove(id: number) {
-    // TODO: this.prisma.avis.delete({ where: { id } })
+  async remove(id: number) {
+    await this.prisma.avis.delete({ where: { id_avis: id } });
     return { id };
   }
 }

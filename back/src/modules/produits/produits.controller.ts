@@ -9,13 +9,16 @@ import { CreateSoldeDto } from './dto/create-solde.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+const MAX_VIDEO_SIZE = 25 * 1024 * 1024;
+
 @Controller('produits')
 export class ProduitsController {
   constructor(private readonly produitsService: ProduitsService) {}
 
   @Post()
   @UseGuards(JwtAuthGuard)
-  @UseInterceptors(FilesInterceptor('medias', 20, { limits: { fileSize: 5 * 1024 * 1024 } }))
+  @UseInterceptors(FilesInterceptor('medias', 20, { limits: { fileSize: MAX_VIDEO_SIZE } }))
   async create(
     @Body() dto: CreateProduitDto,
     @UploadedFiles() files: Array<{ buffer: Buffer; originalname: string; mimetype: string }> = [],
@@ -29,6 +32,10 @@ export class ProduitsController {
   private async saveMedia(file: { buffer: Buffer; originalname: string; mimetype: string }, ordre: number) {
     const type: 'image' | 'video' | null = file.mimetype.startsWith('video/') ? 'video' : file.mimetype.startsWith('image/') ? 'image' : null;
     if (!type) throw new BadRequestException('Seuls les fichiers image et vidéo sont autorisés.');
+    const maxSize = type === 'video' ? MAX_VIDEO_SIZE : MAX_IMAGE_SIZE;
+    if (file.buffer.length > maxSize) {
+      throw new BadRequestException(`La taille maximale autorisée pour une ${type === 'video' ? 'vidéo' : 'image'} est de ${maxSize / (1024 * 1024)} Mo.`);
+    }
 
     const extension = extname(file.originalname).toLowerCase() || (type === 'video' ? '.mp4' : '.jpg');
     const filename = `${type}-${randomUUID()}${extension}`;
@@ -98,7 +105,7 @@ findSimilarProducts(
 
   @Patch(':id')
   @UseGuards(JwtAuthGuard)
-  @UseInterceptors(FilesInterceptor('medias', 20, { limits: { fileSize: 5 * 1024 * 1024 } }))
+  @UseInterceptors(FilesInterceptor('medias', 20, { limits: { fileSize: MAX_VIDEO_SIZE } }))
   async update(
     @Param('id') id: string,
     @Body() dto: Partial<CreateProduitDto>,

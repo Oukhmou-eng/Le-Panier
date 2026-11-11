@@ -34,6 +34,7 @@ import Commandes from './pages/compte/Commandes'
 import Parametres from './pages/compte/Parametres'
 import ParametresVendeur from './pages/vendeur/ParametresVendeur'
 import Statistiques from './pages/vendeur/Statistiques'
+import Dashboard from './pages/vendeur/Dashboard'
 import AdminBoutiques from './pages/admin/Boutiques'
 import AdminDashboard from './pages/admin/Dashboard'
 import AdminUsers from './pages/admin/Users'
@@ -59,6 +60,7 @@ function App() {
         <Route path="/panier"    element={<><Navbar/><Panier /></> } />
          
          <Route path="/vendeur"    element={<><Navbar/><VendeurSidebar/></> } />
+        <Route path="/dashboard-vendeur" element={<><Navbar/><div className="app-connected active"><VendeurSidebar/><Dashboard/></div></>} />
         <Route path="/boutiques"    element={<><Navbar/><Boutiques /></> } />
         <Route path="/boutique/:id"    element={<><Navbar/><Boutique /></> } />
 

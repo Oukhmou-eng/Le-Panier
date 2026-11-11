@@ -1,0 +1,640 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model adresses {
+  id_adresse   Int          @id @default(autoincrement()) @db.UnsignedInt
+  id_user      Int          @db.UnsignedInt
+  libelle      String?      @db.VarChar(100)
+  ligne1       String       @db.VarChar(255)
+  ville        String       @db.VarChar(100)
+  code_postal  String       @db.VarChar(20)
+  tele         String?      @db.VarChar(20)
+  est_defaut   Boolean      @default(false)
+  utilisateurs utilisateurs @relation(fields: [id_user], references: [id_user], onDelete: Cascade, map: "fk_adresses_user")
+  commandes    commandes[]
+
+  @@index([id_user], map: "fk_adresses_user")
+}
+
+model avis {
+  id_avis       Int             @id @default(autoincrement()) @db.UnsignedInt
+  id_cible      Int
+  id_user       Int             @db.UnsignedInt
+  type_cible    avis_type_cible @default(produit)
+  note          Int             @db.UnsignedTinyInt
+  commentaire   String?         @db.Text
+  date_creation DateTime        @default(now()) @db.DateTime(0)
+  utilisateurs  utilisateurs    @relation(fields: [id_user], references: [id_user], onDelete: Cascade, map: "fk_avis_user")
+  reponses_avis reponses_avis?
+
+  @@index([id_cible], map: "fk_avis_produit")
+  @@index([id_user], map: "fk_avis_user")
+}
+
+model boutiques {
+  id_boutique       Int                 @id @default(autoincrement()) @db.UnsignedInt
+  id_user           Int                 @db.UnsignedInt
+  nom               String              @db.VarChar(150)
+  slug              String              @unique(map: "slug") @db.VarChar(170)
+  description       String?             @db.Text
+  logo_url          String?             @db.VarChar(255)
+  banniere_url      String?             @db.VarChar(255)
+  statut            boutiques_statut    @default(actif)
+  note_moyenne      Decimal             @default(0.00) @db.Decimal(3, 2)
+  nbr_abonnes       Int                 @default(0) @db.UnsignedInt
+  date_creation     DateTime            @default(now()) @db.DateTime(0)
+  estVerifier       Boolean             @default(false)
+  utilisateurs      utilisateurs        @relation(fields: [id_user], references: [id_user], onDelete: Cascade, map: "fk_boutiques_user")
+  boutiques_suivies boutiques_suivies[]
+  commande_lignes   commande_lignes[]
+  conversations     conversations[]
+  factures_boutique factures_boutique[]
+  infoboutique      infoboutique?
+  produits          produits[]
+  publicites        publicites[]
+  reponses_avis     reponses_avis[]
+  revenus_vendeur   revenus_vendeur[]
+
+  @@index([id_user], map: "fk_boutiques_user")
+}
+
+model boutiques_suivies {
+  id_boutique_suivie Int          @id @default(autoincrement()) @db.UnsignedInt
+  id_user            Int          @db.UnsignedInt
+  id_boutique        Int          @db.UnsignedInt
+  date_suivi         DateTime     @default(now()) @db.DateTime(0)
+  boutiques          boutiques    @relation(fields: [id_boutique], references: [id_boutique], onDelete: Cascade, map: "fk_boutiques_suivies_boutique")
+  utilisateurs       utilisateurs @relation(fields: [id_user], references: [id_user], onDelete: Cascade, map: "fk_boutiques_suivies_user")
+
+  @@unique([id_user, id_boutique], map: "uq_boutiques_suivies_user_boutique")
+  @@index([id_boutique], map: "fk_boutiques_suivies_boutique")
+}
+
+model categories {
+  id_categorie        Int               @id @default(autoincrement()) @db.UnsignedInt
+  nom                 String            @db.VarChar(100)
+  icone               String?           @db.VarChar(255)
+  id_categorie_parent Int?              @db.UnsignedInt
+  statut              categories_statut @default(actif)
+  categories          categories?       @relation("categoriesTocategories", fields: [id_categorie_parent], references: [id_categorie], map: "fk_categories_parent")
+  other_categories    categories[]      @relation("categoriesTocategories")
+  produits            produits[]
+
+  @@index([id_categorie_parent], map: "fk_categories_parent")
+}
+
+model commande_lignes {
+  id_commande_ligne Int              @id @default(autoincrement()) @db.UnsignedInt
+  id_commande       Int              @db.UnsignedInt
+  id_produit        Int              @db.UnsignedInt
+  id_boutique       Int              @db.UnsignedInt
+  quantite          Int              @db.UnsignedInt
+  prix_unitaire     Decimal          @db.Decimal(10, 2)
+  sous_total        Decimal          @db.Decimal(10, 2)
+  boutiques         boutiques        @relation(fields: [id_boutique], references: [id_boutique], map: "fk_commande_lignes_boutique")
+  commandes         commandes        @relation(fields: [id_commande], references: [id_commande], onDelete: Cascade, map: "fk_commande_lignes_commande")
+  produits          produits         @relation(fields: [id_produit], references: [id_produit], map: "fk_commande_lignes_produit")
+  remboursements    remboursements[]
+  revenus_vendeur   revenus_vendeur?
+
+  @@index([id_boutique], map: "fk_commande_lignes_boutique")
+  @@index([id_produit], map: "fk_commande_lignes_produit")
+  @@index([id_commande], map: "idx_commande_lignes_commande")
+}
+
+model commandes {
+  id_commande     Int               @id @default(autoincrement()) @db.UnsignedInt
+  id_user         Int               @db.UnsignedInt
+  id_adresse      Int               @db.UnsignedInt
+  statut          commandes_statut  @default(en_attente)
+  montant_total   Decimal           @db.Decimal(10, 2)
+  date_commande   DateTime          @default(now()) @db.DateTime(0)
+  commande_lignes commande_lignes[]
+  adresses        adresses          @relation(fields: [id_adresse], references: [id_adresse], map: "fk_commandes_adresse")
+  utilisateurs    utilisateurs      @relation(fields: [id_user], references: [id_user], onDelete: Cascade, map: "fk_commandes_user")
+  paiements       paiements[]
+
+  @@index([id_adresse], map: "fk_commandes_adresse")
+  @@index([id_user], map: "idx_commandes_user")
+}
+
+model conversations {
+  id_conversation Int          @id @default(autoincrement()) @db.UnsignedInt
+  id_user         Int          @db.UnsignedInt
+  id_boutique     Int          @db.UnsignedInt
+  date_creation   DateTime     @default(now()) @db.DateTime(0)
+  date_maj        DateTime     @default(now()) @db.DateTime(0)
+  boutiques       boutiques    @relation(fields: [id_boutique], references: [id_boutique], onDelete: Cascade, map: "fk_conversations_boutique")
+  utilisateurs    utilisateurs @relation(fields: [id_user], references: [id_user], onDelete: Cascade, map: "fk_conversations_user")
+  messages        messages[]
+
+  @@index([id_boutique], map: "fk_conversations_boutique")
+  @@index([id_user], map: "fk_conversations_user")
+}
+
+model factures_boutique {
+  id                    Int                            @id @default(autoincrement())
+  boutique_id           Int                            @db.UnsignedInt
+  type_facture          factures_boutique_type_facture
+  reference_id          Int
+  moyen_paiement_id     Int                            @db.UnsignedInt
+  montant               Decimal                        @db.Decimal(10, 2)
+  statut                factures_boutique_statut
+  reference_transaction String?                        @db.VarChar(255)
+  date_facture          DateTime                       @db.DateTime(0)
+  date_paiement         DateTime?                      @db.DateTime(0)
+  boutiques             boutiques                      @relation(fields: [boutique_id], references: [id_boutique], onUpdate: Restrict, map: "factures_boutique_ibfk_1")
+  moyens_paiement       moyens_paiement                @relation(fields: [moyen_paiement_id], references: [id_moyen_paiement], onUpdate: Restrict, map: "factures_boutique_ibfk_2")
+
+  @@index([boutique_id], map: "boutique_id")
+  @@index([moyen_paiement_id], map: "moyen_paiement_id")
+}
+
+model favoris {
+  id_favori    Int          @id @default(autoincrement()) @db.UnsignedInt
+  id_user      Int          @db.UnsignedInt
+  id_produit   Int          @db.UnsignedInt
+  date_ajout   DateTime     @default(now()) @db.DateTime(0)
+  produits     produits     @relation(fields: [id_produit], references: [id_produit], onDelete: Cascade, map: "fk_favoris_produit")
+  utilisateurs utilisateurs @relation(fields: [id_user], references: [id_user], onDelete: Cascade, map: "fk_favoris_user")
+
+  @@unique([id_user, id_produit], map: "uq_favoris_user_produit")
+  @@index([id_produit], map: "fk_favoris_produit")
+}
+
+model infoboutique {
+  id          Int       @id @default(autoincrement()) @db.UnsignedInt
+  id_boutique Int       @unique(map: "id_boutique") @db.UnsignedInt
+  adresse     String    @db.VarChar(255)
+  tele        String?   @db.VarChar(20)
+  emailprof   String?   @db.VarChar(255)
+  instagram   String?   @db.VarChar(255)
+  facebook    String?   @db.VarChar(255)
+  boutiques   boutiques @relation(fields: [id_boutique], references: [id_boutique], onDelete: Cascade, map: "fk_infoboutique_boutique")
+}
+
+model messages {
+  id_message              Int                       @id @default(autoincrement()) @db.UnsignedInt
+  id_conversation         Int                       @db.UnsignedInt
+  id_user                 Int                       @db.UnsignedInt
+  id_produit              Int?                      @db.UnsignedInt
+  contenu                 String                    @db.Text
+  type_message            messages_type_message     @default(texte)
+  date_creation           DateTime                  @default(now()) @db.DateTime(0)
+  date_maj                DateTime                  @default(now()) @db.DateTime(0)
+  conversations           conversations             @relation(fields: [id_conversation], references: [id_conversation], onDelete: Cascade, map: "fk_messages_conversation")
+  produits                produits?                 @relation(fields: [id_produit], references: [id_produit], map: "fk_messages_produit")
+  utilisateurs            utilisateurs              @relation(fields: [id_user], references: [id_user], onDelete: Cascade, map: "fk_messages_user")
+  messages_pieces_jointes messages_pieces_jointes[]
+  messages_statuts        messages_statuts[]
+
+  @@index([id_produit], map: "fk_messages_produit")
+  @@index([id_user], map: "fk_messages_user")
+  @@index([id_conversation], map: "idx_messages_conversation")
+}
+
+model messages_pieces_jointes {
+  id_piece_jointe Int      @id @default(autoincrement()) @db.UnsignedInt
+  id_message      Int      @db.UnsignedInt
+  url_fichier     String   @db.VarChar(255)
+  nom_fichier     String?  @db.VarChar(255)
+  type_fichier    String?  @db.VarChar(100)
+  taille_fichier  Int?     @db.UnsignedInt
+  messages        messages @relation(fields: [id_message], references: [id_message], onDelete: Cascade, map: "fk_messages_pieces_jointes_message")
+
+  @@index([id_message], map: "fk_messages_pieces_jointes_message")
+}
+
+model messages_statuts {
+  id_message_statut Int                     @id @default(autoincrement()) @db.UnsignedInt
+  id_message        Int                     @db.UnsignedInt
+  id_user           Int                     @db.UnsignedInt
+  statut            messages_statuts_statut @default(envoye)
+  date_lecture      DateTime?               @db.DateTime(0)
+  messages          messages                @relation(fields: [id_message], references: [id_message], onDelete: Cascade, map: "fk_messages_statuts_message")
+  utilisateurs      utilisateurs            @relation(fields: [id_user], references: [id_user], onDelete: Cascade, map: "fk_messages_statuts_user")
+
+  @@unique([id_message, id_user], map: "uq_messages_statuts_message_user")
+  @@index([id_user], map: "fk_messages_statuts_user")
+}
+
+model moyens_paiement {
+  id_moyen_paiement Int                  @id @default(autoincrement()) @db.UnsignedInt
+  id_user           Int                  @db.UnsignedInt
+  fournisseur       String               @db.VarChar(100)
+  type              moyens_paiement_type @default(carte)
+  jeton_paiement    String               @db.VarChar(255)
+  derniers_chiffres String?              @db.VarChar(4)
+  date_expiration   DateTime?            @db.Date
+  est_defaut        Boolean              @default(false)
+  date_creation     DateTime             @default(now()) @db.DateTime(0)
+  factures_boutique factures_boutique[]
+  utilisateurs      utilisateurs         @relation(fields: [id_user], references: [id_user], onDelete: Cascade, map: "fk_moyens_paiement_user")
+  paiements         paiements[]
+
+  @@index([id_user], map: "fk_moyens_paiement_user")
+}
+
+model notifications {
+  id_notification Int          @id @default(autoincrement()) @db.UnsignedInt
+  id_user         Int          @db.UnsignedInt
+  type            String       @db.VarChar(100)
+  contenu         String       @db.Text
+  lien            String?      @db.VarChar(255)
+  lu              Boolean      @default(false)
+  date_creation   DateTime     @default(now()) @db.DateTime(0)
+  utilisateurs    utilisateurs @relation(fields: [id_user], references: [id_user], onDelete: Cascade, map: "fk_notifications_user")
+
+  @@index([id_user, lu], map: "idx_notifications_user_lu")
+}
+
+model paiements {
+  id_paiement           Int              @id @default(autoincrement()) @db.UnsignedInt
+  id_commande           Int              @db.UnsignedInt
+  id_moyen_paiement     Int?             @db.UnsignedInt
+  montant               Decimal          @db.Decimal(10, 2)
+  methode               String           @db.VarChar(50)
+  fournisseur           String?          @db.VarChar(100)
+  statut                paiements_statut @default(en_attente)
+  reference_transaction String?          @db.VarChar(150)
+  date_paiement         DateTime         @default(now()) @db.DateTime(0)
+  commandes             commandes        @relation(fields: [id_commande], references: [id_commande], onDelete: Cascade, map: "fk_paiements_commande")
+  moyens_paiement       moyens_paiement? @relation(fields: [id_moyen_paiement], references: [id_moyen_paiement], map: "fk_paiements_moyen_paiement")
+  remboursements        remboursements[]
+
+  @@index([id_commande], map: "fk_paiements_commande")
+  @@index([id_moyen_paiement], map: "fk_paiements_moyen_paiement")
+}
+
+model panier_items {
+  id_panier_item Int          @id @default(autoincrement()) @db.UnsignedInt
+  id_user        Int          @db.UnsignedInt
+  id_produit     Int          @db.UnsignedInt
+  quantite       Int          @default(1) @db.UnsignedInt
+  est_enregistre Boolean      @default(false)
+  date_ajout     DateTime     @default(now()) @db.DateTime(0)
+  produits       produits     @relation(fields: [id_produit], references: [id_produit], onDelete: Cascade, map: "fk_panier_items_produit")
+  utilisateurs   utilisateurs @relation(fields: [id_user], references: [id_user], onDelete: Cascade, map: "fk_panier_items_user")
+
+  @@unique([id_user, id_produit], map: "uq_panier_user_produit")
+  @@index([id_produit], map: "fk_panier_items_produit")
+}
+
+model plans_tarifs {
+  id            Int                     @id @default(autoincrement()) @db.UnsignedInt
+  nom_plan      String                  @unique(map: "nom_plan") @db.VarChar(50)
+  type_cible    plans_tarifs_type_cible
+  duree_jours   Int                     @db.UnsignedInt
+  prix          Decimal                 @db.Decimal(10, 2)
+  priorite      Int?                    @default(0) @db.UnsignedInt
+  statut        plans_tarifs_statut     @default(actif)
+  modifie_par   Int?                    @db.UnsignedInt
+  date_creation DateTime                @default(now()) @db.DateTime(0)
+  date_maj      DateTime                @default(now()) @db.DateTime(0)
+  utilisateurs  utilisateurs?           @relation(fields: [modifie_par], references: [id_user], onDelete: Restrict, onUpdate: Restrict, map: "fk_plan_admin")
+  promouvoir    promouvoir[]
+
+  @@index([modifie_par], map: "fk_plan_admin")
+}
+
+model produit_medias {
+  id_media   Int                 @id @default(autoincrement()) @db.UnsignedInt
+  id_produit Int                 @db.UnsignedInt
+  type       produit_medias_type @default(video)
+  url        String              @db.VarChar(255)
+  ordre      Int                 @default(0) @db.UnsignedSmallInt
+  produits   produits            @relation(fields: [id_produit], references: [id_produit], onDelete: Cascade, map: "fk_produit_medias_produit")
+
+  @@index([id_produit], map: "fk_produit_medias_produit")
+}
+
+model produits {
+  id_produit      Int               @id @default(autoincrement()) @db.UnsignedInt
+  id_boutique     Int               @db.UnsignedInt
+  id_categorie    Int?              @db.UnsignedInt
+  nom             String            @db.VarChar(200)
+  description     String?           @db.Text
+  prix            Decimal           @db.Decimal(10, 2)
+  stock           Int               @default(0) @db.UnsignedInt
+  statut          produits_statut   @default(brouillon)
+  date_creation   DateTime          @default(now()) @db.DateTime(0)
+  date_maj        DateTime          @default(now()) @db.DateTime(0)
+  est_vedette     Boolean           @default(false)
+  commande_lignes commande_lignes[]
+  favoris         favoris[]
+  messages        messages[]
+  panier_items    panier_items[]
+  produit_medias  produit_medias[]
+  boutiques       boutiques         @relation(fields: [id_boutique], references: [id_boutique], onDelete: Cascade, map: "fk_produits_boutique")
+  categories      categories?       @relation(fields: [id_categorie], references: [id_categorie], map: "fk_produits_categorie")
+  promouvoir      promouvoir[]
+  publicites      publicites[]
+  soldes          soldes[]
+
+  @@index([id_boutique], map: "idx_produits_boutique")
+  @@index([id_categorie], map: "idx_produits_categorie")
+}
+
+model promouvoir {
+  id_promotion  Int               @id @default(autoincrement()) @db.UnsignedInt
+  id_produit    Int               @db.UnsignedInt
+  plan          String            @db.VarChar(100)
+  plan_tarif_id Int?              @db.UnsignedInt
+  priorite      Int               @default(0) @db.UnsignedSmallInt
+  date_debut    DateTime          @db.DateTime(0)
+  date_fin      DateTime          @db.DateTime(0)
+  statut        promouvoir_statut @default(en_attente)
+  date_creation DateTime          @default(now()) @db.DateTime(0)
+  plans_tarifs  plans_tarifs?     @relation(fields: [plan_tarif_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_promouvoir_plan")
+  produits      produits          @relation(fields: [id_produit], references: [id_produit], onDelete: Cascade, map: "fk_promouvoir_produit")
+
+  @@index([plan_tarif_id], map: "fk_promouvoir_plan")
+  @@index([id_produit], map: "fk_promouvoir_produit")
+}
+
+model publicites {
+  id_publicite  Int               @id @default(autoincrement()) @db.UnsignedInt
+  id_boutique   Int               @db.UnsignedInt
+  id_produit    Int?              @db.UnsignedInt
+  budget        Decimal           @db.Decimal(10, 2)
+  cout_par_clic Decimal           @db.Decimal(10, 2)
+  impressions   Int               @default(0) @db.UnsignedInt
+  clics         Int               @default(0) @db.UnsignedInt
+  statut        publicites_statut @default(en_attente)
+  date_debut    DateTime          @db.DateTime(0)
+  date_fin      DateTime          @db.DateTime(0)
+  boutiques     boutiques         @relation(fields: [id_boutique], references: [id_boutique], onDelete: Cascade, map: "fk_publicites_boutique")
+  produits      produits?         @relation(fields: [id_produit], references: [id_produit], map: "fk_publicites_produit")
+
+  @@index([id_boutique], map: "fk_publicites_boutique")
+  @@index([id_produit], map: "fk_publicites_produit")
+}
+
+model remboursements {
+  id_remboursement  Int                   @id @default(autoincrement()) @db.UnsignedInt
+  id_paiement       Int                   @db.UnsignedInt
+  id_commande_ligne Int                   @db.UnsignedInt
+  montant           Decimal               @db.Decimal(10, 2)
+  motif             String?               @db.VarChar(255)
+  statut            remboursements_statut @default(demande)
+  id_admin          Int?                  @db.UnsignedInt
+  date_demande      DateTime              @default(now()) @db.DateTime(0)
+  date_traitement   DateTime?             @db.DateTime(0)
+  utilisateurs      utilisateurs?         @relation(fields: [id_admin], references: [id_user], map: "fk_remboursements_admin")
+  commande_lignes   commande_lignes       @relation(fields: [id_commande_ligne], references: [id_commande_ligne], onDelete: Cascade, map: "fk_remboursements_commande_ligne")
+  paiements         paiements             @relation(fields: [id_paiement], references: [id_paiement], onDelete: Cascade, map: "fk_remboursements_paiement")
+
+  @@index([id_admin], map: "fk_remboursements_admin")
+  @@index([id_commande_ligne], map: "fk_remboursements_commande_ligne")
+  @@index([id_paiement], map: "fk_remboursements_paiement")
+}
+
+model reponses_avis {
+  id_reponse        Int       @id @default(autoincrement()) @db.UnsignedInt
+  id_avis           Int       @unique(map: "id_avis") @db.UnsignedInt
+  id_boutique       Int       @db.UnsignedInt
+  reponse           String    @db.Text
+  date_creation     DateTime? @default(now()) @db.DateTime(0)
+  date_modification DateTime? @default(now()) @db.DateTime(0)
+  avis              avis      @relation(fields: [id_avis], references: [id_avis], onDelete: Cascade, onUpdate: Restrict, map: "reponses_avis_ibfk_1")
+  boutiques         boutiques @relation(fields: [id_boutique], references: [id_boutique], onDelete: Cascade, onUpdate: Restrict, map: "reponses_avis_ibfk_2")
+
+  @@index([id_boutique], map: "id_boutique")
+}
+
+model revenus_vendeur {
+  id_revenu         Int                    @id @default(autoincrement()) @db.UnsignedInt
+  id_boutique       Int                    @db.UnsignedInt
+  id_commande_ligne Int                    @unique(map: "uq_revenus_vendeur_commande_ligne") @db.UnsignedInt
+  montant_brut      Decimal                @db.Decimal(10, 2)
+  commission        Decimal                @db.Decimal(10, 2)
+  montant_net       Decimal                @db.Decimal(10, 2)
+  statut            revenus_vendeur_statut @default(en_attente)
+  date              DateTime               @default(now()) @db.DateTime(0)
+  boutiques         boutiques              @relation(fields: [id_boutique], references: [id_boutique], onDelete: Cascade, map: "fk_revenus_vendeur_boutique")
+  commande_lignes   commande_lignes        @relation(fields: [id_commande_ligne], references: [id_commande_ligne], onDelete: Cascade, map: "fk_revenus_vendeur_commande_ligne")
+
+  @@index([id_boutique], map: "fk_revenus_vendeur_boutique")
+}
+
+model signalements {
+  id_signalement                                   Int                     @id @default(autoincrement()) @db.UnsignedInt
+  id_user                                          Int                     @db.UnsignedInt
+  type_cible                                       signalements_type_cible
+  id_cible                                         Int                     @db.UnsignedInt
+  motif                                            String                  @db.VarChar(150)
+  description                                      String?                 @db.Text
+  statut                                           signalements_statut     @default(ouvert)
+  id_admin                                         Int?                    @db.UnsignedInt
+  date_creation                                    DateTime                @default(now()) @db.DateTime(0)
+  date_traitement                                  DateTime?               @db.DateTime(0)
+  utilisateurs_signalements_id_adminToutilisateurs utilisateurs?           @relation("signalements_id_adminToutilisateurs", fields: [id_admin], references: [id_user], map: "fk_signalements_admin")
+  utilisateurs_signalements_id_userToutilisateurs  utilisateurs            @relation("signalements_id_userToutilisateurs", fields: [id_user], references: [id_user], onDelete: Cascade, map: "fk_signalements_user")
+
+  @@index([id_admin], map: "fk_signalements_admin")
+  @@index([id_user], map: "fk_signalements_user")
+  @@index([type_cible, id_cible], map: "idx_signalements_cible")
+}
+
+model soldes {
+  id_solde         Int                   @id @default(autoincrement()) @db.UnsignedInt
+  id_produit       Int                   @db.UnsignedInt
+  type_reduction   soldes_type_reduction
+  valeur_reduction Decimal               @db.Decimal(10, 2)
+  prix_promo       Decimal               @db.Decimal(10, 2)
+  date_debut       DateTime              @db.DateTime(0)
+  date_fin         DateTime              @db.DateTime(0)
+  statut           soldes_statut         @default(en_attente)
+  date_creation    DateTime              @default(now()) @db.DateTime(0)
+  produits         produits              @relation(fields: [id_produit], references: [id_produit], onDelete: Cascade, map: "fk_soldes_produit")
+
+  @@index([id_produit], map: "fk_soldes_produit")
+}
+
+model utilisateurs {
+  id_user                                          Int                 @id @default(autoincrement()) @db.UnsignedInt
+  nom                                              String              @db.VarChar(100)
+  prenom                                           String              @db.VarChar(100)
+  email                                            String              @unique(map: "email") @db.VarChar(150)
+  password                                         String              @db.VarChar(255)
+  tele                                             String?             @db.VarChar(20)
+  logo_url                                         String?             @db.VarChar(255)
+  role                                             utilisateurs_role   @default(user)
+  statut                                           utilisateurs_statut @default(actif)
+  date_creation                                    DateTime            @default(now()) @db.DateTime(0)
+  derniere_connexion                               DateTime?           @db.DateTime(0)
+  adresses                                         adresses[]
+  avis                                             avis[]
+  boutiques                                        boutiques[]
+  boutiques_suivies                                boutiques_suivies[]
+  commandes                                        commandes[]
+  conversations                                    conversations[]
+  favoris                                          favoris[]
+  messages                                         messages[]
+  messages_statuts                                 messages_statuts[]
+  moyens_paiement                                  moyens_paiement[]
+  notifications                                    notifications[]
+  panier_items                                     panier_items[]
+  plans_tarifs                                     plans_tarifs[]
+  remboursements                                   remboursements[]
+  signalements_signalements_id_adminToutilisateurs signalements[]      @relation("signalements_id_adminToutilisateurs")
+  signalements_signalements_id_userToutilisateurs  signalements[]      @relation("signalements_id_userToutilisateurs")
+}
+
+enum factures_boutique_type_facture {
+  publicite
+  promotion
+  abonnement
+}
+
+enum plans_tarifs_type_cible {
+  produit
+  boutique
+}
+
+enum produit_medias_type {
+  image
+  video
+}
+
+enum signalements_type_cible {
+  produit
+  boutique
+  utilisateur
+  avis
+  message
+}
+
+enum soldes_type_reduction {
+  pourcentage
+  montant_fixe
+}
+
+enum avis_type_cible {
+  produit
+  boutique
+}
+
+enum commandes_statut {
+  en_attente
+  confirmee
+  expediee
+  livree
+  annulee
+  remboursee
+}
+
+enum messages_statuts_statut {
+  envoye
+  recu
+  lu
+}
+
+enum moyens_paiement_type {
+  carte
+  portefeuille
+  virement
+  autre
+}
+
+enum categories_statut {
+  actif
+  inactif
+}
+
+enum messages_type_message {
+  texte
+  image
+  fichier
+  produit
+  systeme
+}
+
+enum remboursements_statut {
+  demande
+  approuve
+  refuse
+  traite
+}
+
+enum factures_boutique_statut {
+  en_attente
+  paye
+  echoue
+  rembourse
+}
+
+enum paiements_statut {
+  en_attente
+  valide
+  echoue
+  rembourse
+}
+
+enum plans_tarifs_statut {
+  actif
+  inactif
+}
+
+enum revenus_vendeur_statut {
+  en_attente
+  disponible
+  verse
+  annule
+}
+
+enum signalements_statut {
+  ouvert
+  en_cours
+  resolu
+  rejete
+}
+
+enum boutiques_statut {
+  actif
+  suspendu
+}
+
+enum produits_statut {
+  brouillon
+  en_ligne
+  rupture
+  archive
+}
+
+enum promouvoir_statut {
+  en_attente
+  active
+  expiree
+  annulee
+}
+
+enum publicites_statut {
+  en_attente
+  active
+  en_pause
+  terminee
+}
+
+enum soldes_statut {
+  en_attente
+  active
+  expiree
+  annulee
+}
+
+enum utilisateurs_role {
+  user
+  admin
+}
+
+enum utilisateurs_statut {
+  actif
+  suspendu
+}

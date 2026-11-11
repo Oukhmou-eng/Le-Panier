@@ -43,7 +43,7 @@ h1,h2,h3{ font-family:'Fraunces', serif; font-weight:600; margin:0; }
 .fiche-video{
   min-height:340px;
   border-radius:18px;
-  background: linear-gradient(135deg,#6abf5a,#3e8b4b);
+  background: #f3f5f1;
   position:relative;
   overflow:hidden;
   display:flex;
@@ -180,6 +180,7 @@ h1,h2,h3{ font-family:'Fraunces', serif; font-weight:600; margin:0; }
   gap:14px;
   flex-wrap:wrap;
 }
+.fiche-contact-error{ margin:10px 0 0; color:var(--danger); font-size:13px; }
 .section-head{
   display:flex;
   justify-content:space-between;

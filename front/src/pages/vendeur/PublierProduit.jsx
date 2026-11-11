@@ -3,6 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import '../../css/PublierProduit.css';
 
 const MAX_VIDEOS = 1;
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+const MAX_VIDEO_SIZE = 25 * 1024 * 1024;
 const API_URL = 'http://localhost:3000';
 const token = localStorage.getItem('token');
 const id_boutique = localStorage.getItem('id_boutique');
@@ -100,9 +102,16 @@ function PublierProduit() {
     const files = Array.from(event.target.files || []);
     let videoTotal = media.filter((item) => item.type === 'video').length;
     let refusedVideos = 0;
+    let rejectionMessage = '';
     const accepted = [];
     files.forEach((file) => {
       const type = file.type.startsWith('video/') ? 'video' : 'image';
+      const maxSize = type === 'video' ? MAX_VIDEO_SIZE : MAX_IMAGE_SIZE;
+      if (file.size > maxSize) {
+        refusedVideos += type === 'video' ? 1 : 0;
+        rejectionMessage = rejectionMessage || `La taille maximale autorisée pour une ${type === 'video' ? 'vidéo' : 'image'} est de ${maxSize / (1024 * 1024)} Mo.`;
+        return;
+      }
       if (type === 'video' && videoTotal >= MAX_VIDEOS) {
         refusedVideos += 1;
         return;
@@ -111,7 +120,7 @@ function PublierProduit() {
       accepted.push({ file, url: URL.createObjectURL(file), type });
     });
     if (accepted.length) setMedia((current) => [...current, ...accepted]);
-    setError(refusedVideos ? `Une seule vidéo est autorisée. ${refusedVideos} vidéo(s) n’ont pas été ajoutée(s).` : '');
+    setError(rejectionMessage || (refusedVideos ? `Une seule vidéo est autorisée. ${refusedVideos} vidéo(s) n’ont pas été ajoutée(s).` : ''));
     event.target.value = '';
   };
 
@@ -319,7 +328,7 @@ function PublierProduit() {
                 <span className="dropzone-icon">🖼️</span>
                 <span className="dropzone-title">Ajouter des photos ou une vidéo</span>
                 <span className="dropzone-hint">
-                  Cliquez ou glissez-déposez — PNG, JPG jusqu'à 5 Mo · {MAX_VIDEOS} vidéo max ({videoCount}/{MAX_VIDEOS})
+                  Cliquez ou glissez-déposez — PNG, JPG jusqu'à 5 Mo · vidéo jusqu'à 25 Mo · {MAX_VIDEOS} vidéo max ({videoCount}/{MAX_VIDEOS})
                 </span>
               </label>
 

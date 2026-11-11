@@ -261,7 +261,9 @@ if (!token) {
                     />
                   ) : null}
 
-                  <span className="play">▶</span>
+                  {product.mediaType?.toLowerCase() === "video" && product.mediaUrl && (
+                    <span className="play" aria-label="Ce produit contient une vidéo">▶</span>
+                  )}
                 </div>
 
                 <div className="card-body">

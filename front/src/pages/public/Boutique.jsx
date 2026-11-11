@@ -125,8 +125,25 @@ const toggleFollow = async (boutiqueId) => {
         // Informations de la boutique
         setBoutique(data.boutique);
 
-        // Liste des produits
-        setProduits(data.produits);
+        // Liste des produits avec leur éventuelle promotion active
+        setProduits((data?.produits ?? []).map((produit) => {
+          const prix = Number(produit.prix ?? 0);
+          const prixPromo = produit.prix_promo === null || produit.prix_promo === undefined
+            ? null
+            : Number(produit.prix_promo);
+          const discountPercent = produit.type_reduction === 'pourcentage'
+            ? Number(produit.valeur_reduction ?? 0)
+            : prixPromo !== null && prix > 0
+              ? Math.round(((prix - prixPromo) / prix) * 100)
+              : 0;
+
+          return {
+            ...produit,
+            prix,
+            prixPromo,
+            discountPercent,
+          };
+        }));
 
       } catch (error) {
         console.error(error);
@@ -210,9 +227,26 @@ if (!token) {
       }
     };
 
+  const handleVideoEnter = (event) => {
+    const video = event.currentTarget.querySelector("video");
+    if (video) {
+      video.currentTime = 0;
+      video.play().catch(() => {});
+    }
+  };
+
+  const handleVideoLeave = (event) => {
+    const video = event.currentTarget.querySelector("video");
+    if (video) {
+      video.pause();
+      video.currentTime = 0;
+    }
+  };
+
   // URLs banniere/logo venant des données de la boutique renvoyées par le backend
   const bannerUrl = boutique?.banniere_url || "";
   const logoUrl = boutique?.logo_url || "";
+  const infosBoutique = boutique?.infoboutique ?? boutique ?? {};
 
   const [bannerExists, setBannerExists] = useState(false);
   const [logoExists, setLogoExists] = useState(false);
@@ -313,42 +347,42 @@ if (!token) {
     </div>
   </div>
 
-  {(boutique?.adresse || boutique?.tele || boutique?.emailprof || boutique?.instagram || boutique?.facebook) && (
+  {(infosBoutique.adresse || infosBoutique.tele || infosBoutique.emailprof || infosBoutique.instagram || infosBoutique.facebook) && (
     <div className="shop-info-panel">
-      {boutique?.adresse && (
+      {infosBoutique.adresse && (
         <div className="shop-info-card">
           <span>Adresse</span>
-          <strong>{boutique.adresse}</strong>
+          <strong>{infosBoutique.adresse}</strong>
         </div>
       )}
-      {boutique?.tele && (
+      {infosBoutique.tele && (
         <div className="shop-info-card">
           <span>Téléphone</span>
-          <strong>{boutique.tele}</strong>
+          <strong>{infosBoutique.tele}</strong>
         </div>
       )}
-      {boutique?.emailprof && (
+      {infosBoutique.emailprof && (
         <div className="shop-info-card">
           <span>Email</span>
-          <strong>{boutique.emailprof}</strong>
+          <strong>{infosBoutique.emailprof}</strong>
         </div>
       )}
-      {(boutique?.instagram || boutique?.facebook) && (
+      {(infosBoutique.instagram || infosBoutique.facebook) && (
         <div className="shop-info-card shop-info-social">
           <span>Réseaux</span>
           <div className="shop-social">
-            {boutique.instagram && (
+            {infosBoutique.instagram && (
               <a
-                href={boutique.instagram.startsWith('http') ? boutique.instagram : `https://www.instagram.com/${boutique.instagram.replace(/^@/, '')}`}
+                href={infosBoutique.instagram.startsWith('http') ? infosBoutique.instagram : `https://www.instagram.com/${infosBoutique.instagram.replace(/^@/, '')}`}
                 target="_blank"
                 rel="noreferrer"
               >
                 Instagram
               </a>
             )}
-            {boutique.facebook && (
+            {infosBoutique.facebook && (
               <a
-                href={boutique.facebook.startsWith('http') ? boutique.facebook : `https://www.facebook.com/${boutique.facebook.replace(/^@/, '')}`}
+                href={infosBoutique.facebook.startsWith('http') ? infosBoutique.facebook : `https://www.facebook.com/${infosBoutique.facebook.replace(/^@/, '')}`}
                 target="_blank"
                 rel="noreferrer"
               >
@@ -388,22 +422,53 @@ if (!token) {
 
   <div id="shop-pane-produits">
     <div className="grid" >
-      {produitsVisibles.map((produit) => (
+      {produitsVisibles.map((produit) => {
+        const estVideo = produit.type?.toLowerCase() === 'video';
+        const estEnSolde = produit.prixPromo !== null && produit.prixPromo < produit.prix;
+        return (
         
-        <div className="card" key={produit.id_produit}>
+        <div
+          className="card"
+          key={produit.id_produit}
+          onMouseEnter={handleVideoEnter}
+          onMouseLeave={handleVideoLeave}
+        >
           <div
             className="thumb"
-            style={produit.url && produit.type === 'image' ? { backgroundImage: `url(${produit.url})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
+            style={produit.url && !estVideo ? { backgroundImage: `url(${produit.url})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
           >
-            <span className="play">▶</span>
+            {estVideo && produit.url && (
+              <video
+                src={produit.url}
+                muted
+                loop
+                playsInline
+                preload="metadata"
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            )}
+            {estEnSolde && produit.discountPercent > 0 && (
+              <span className="solde-badge">-{produit.discountPercent}%</span>
+            )}
+            {estVideo && produit.url && (
+              <span className="play" aria-label="Ce produit contient une vidéo">▶</span>
+            )}
           </div>
           <div className="card-body">
             <div className="name">{produit.nom}</div>
             <div className="shop">{boutique?.nom}</div>
-            <div className="price">{produit.prix} MAD</div>
+            {estEnSolde ? (
+              <div className="solde-prices">
+                <span className="price-old">{produit.prix} MAD</span>
+                <span className="price">{produit.prixPromo} MAD</span>
+              </div>
+            ) : (
+              <div className="price">{produit.prix} MAD</div>
+            )}
           </div>
         </div>
-      ))}
+        );
+      })}
     </div>
 
     {nombreProduitsAffiches < produits.length && (

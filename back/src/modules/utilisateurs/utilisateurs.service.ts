@@ -1,211 +1,120 @@
 import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { CreateUtilisateurDto } from './dto/create-utilisateur.dto';
-import { DatabaseService } from '../../database/database.service';
+import { PrismaService } from '../../database/prisma.service';
 
 @Injectable()
 export class UtilisateursService {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async create(dto: CreateUtilisateurDto) {
     const { prenom, nom, email, password, tele, role, statut } = dto;
-
     if (!prenom?.trim() || !nom?.trim() || !email?.trim() || !password) {
       throw new BadRequestException('Prénom, nom, email et mot de passe sont requis.');
     }
-
-    const existing = await this.db.query('SELECT id_user FROM utilisateurs WHERE email = ?', [email.trim()]);
-    if (existing?.length > 0) {
+    const normalizedEmail = email.trim();
+    if (await this.prisma.utilisateurs.findUnique({ where: { email: normalizedEmail }, select: { id_user: true } })) {
       throw new BadRequestException('Cet email est déjà utilisé.');
     }
-
     const normalizedRole = role?.toLowerCase() === 'admin' ? 'admin' : 'user';
     const normalizedStatut = statut === 'suspendu' ? 'suspendu' : 'actif';
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const result: any = await this.db.query(
-      `INSERT INTO utilisateurs (nom, prenom, email, password, tele, role, statut, date_creation)
-       VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
-      [nom.trim(), prenom.trim(), email.trim(), hashedPassword, tele?.trim() || null, normalizedRole, normalizedStatut],
-    );
-
-    return {
-      id_user: result?.insertId ?? null,
-      prenom: prenom.trim(),
-      nom: nom.trim(),
-      email: email.trim(),
-      tele: tele?.trim() || null,
-      role: normalizedRole,
-      statut: normalizedStatut,
-    };
+    const user = await this.prisma.utilisateurs.create({
+      data: { nom: nom.trim(), prenom: prenom.trim(), email: normalizedEmail, password: await bcrypt.hash(password, 10), tele: tele?.trim() || null, role: normalizedRole, statut: normalizedStatut },
+    });
+    return { id_user: user.id_user, prenom: user.prenom, nom: user.nom, email: user.email, tele: user.tele, role: user.role, statut: user.statut };
   }
 
   async par(id: number) {
-  try {
-    const users = await this.db.query(
-      `
-      SELECT
-        u.prenom,
-        u.nom,
-        u.email,
-        u.tele,
-        u.logo_url,
-        a.ville,
-        a.ligne1 AS adresse,
-        a.code_postal
-      FROM utilisateurs u
-      LEFT JOIN adresses a
-        ON u.id_user = a.id_user
-      WHERE u.id_user = ?
-      `,
-      [id],
-    );
-
-    return { user: users[0] ?? null, };
-  } catch (error) {
-    console.error(error);
-
-    return {
-      msg: "Erreur",
-    };
+    try {
+      const user = await this.prisma.utilisateurs.findUnique({
+        where: { id_user: id },
+        select: { prenom: true, nom: true, email: true, tele: true, logo_url: true, adresses: { take: 1, select: { ville: true, ligne1: true, code_postal: true } } },
+      });
+      if (!user) return { user: null };
+      const adresse = user.adresses[0];
+      return { user: { prenom: user.prenom, nom: user.nom, email: user.email, tele: user.tele, logo_url: user.logo_url, ville: adresse?.ville ?? null, adresse: adresse?.ligne1 ?? null, code_postal: adresse?.code_postal ?? null } };
+    } catch (error) {
+      console.error(error);
+      return { msg: 'Erreur' };
+    }
   }
-}
 
-  async findAll() {
+  findAll() {
     return this.findAllAdmin();
   }
 
   async findAllAdmin(search = '', role = '', statut = '') {
-    const conditions = ['1=1'];
-    const params: any[] = [];
-
-    if (search?.trim()) {
-      conditions.push(`(prenom LIKE ? OR nom LIKE ? OR email LIKE ?)`);
-      const term = `%${search.trim()}%`;
-      params.push(term, term, term);
-    }
-
-    if (role) {
-      const normalizedRole = role.toLowerCase() === 'admin' ? 'admin' : 'user';
-      conditions.push('role = ?');
-      params.push(normalizedRole);
-    }
-
-    if (statut) {
-      const normalizedStatut = statut === 'suspendu' ? 'suspendu' : 'actif';
-      conditions.push('statut = ?');
-      params.push(normalizedStatut);
-    }
-
-    const users = await this.db.query(
-      `SELECT id_user, prenom, nom, email, tele, logo_url, role, statut, date_creation
-       FROM utilisateurs
-       WHERE ${conditions.join(' AND ')}
-       ORDER BY date_creation DESC`,
-      params,
-    );
-
-    return { users: users ?? [] };
+    const normalizedRole = role ? (role.toLowerCase() === 'admin' ? 'admin' : 'user') : undefined;
+    const normalizedStatut = statut ? (statut === 'suspendu' ? 'suspendu' : 'actif') : undefined;
+    const users = await this.prisma.utilisateurs.findMany({
+      where: {
+        ...(search.trim() ? { OR: [{ prenom: { contains: search.trim() } }, { nom: { contains: search.trim() } }, { email: { contains: search.trim() } }] } : {}),
+        ...(normalizedRole ? { role: normalizedRole } : {}),
+        ...(normalizedStatut ? { statut: normalizedStatut } : {}),
+      },
+      orderBy: { date_creation: 'desc' },
+      select: { id_user: true, prenom: true, nom: true, email: true, tele: true, logo_url: true, role: true, statut: true, date_creation: true },
+    });
+    return { users };
   }
 
-  async findOne(id: number) {
-    // TODO: this.prisma.utilisateurs.findUnique({ where: { id } })
-    return { id };
+  findOne(id: number) {
+    return this.prisma.utilisateurs.findUnique({ where: { id_user: id } });
   }
 
   async updateMe(id: number, dto: Partial<CreateUtilisateurDto>) {
     const { prenom, nom, email, tele, adresse, ville, code_postal } = dto;
-    const connection = await this.db.getPool().getConnection();
-
-    try {
-      await connection.beginTransaction();
-      await connection.execute(
-        `UPDATE utilisateurs
-         SET prenom = ?, nom = ?, email = ?, tele = ?
-         WHERE id_user = ?`,
-        [prenom ?? null, nom ?? null, email ?? null, tele ?? null, id],
-      );
-
-      const [addresses] = await connection.execute(
-        'SELECT id_user FROM adresses WHERE id_user = ? LIMIT 1',
-        [id],
-      );
-
-      if ((addresses as any[]).length > 0) {
-        await connection.execute(
-          `UPDATE adresses
-           SET ligne1 = ?, ville = ?, code_postal = ?
-           WHERE id_user = ?`,
-          [adresse ?? null, ville ?? null, code_postal ?? null, id],
-        );
-      } else {
-        await connection.execute(
-          `INSERT INTO adresses (id_user, ligne1, ville, code_postal)
-           VALUES (?, ?, ?, ?)`,
-          [id, adresse ?? null, ville ?? null, code_postal ?? null],
-        );
-      }
-
-      await connection.commit();
-      return this.par(id);
-    } catch (error) {
-      await connection.rollback();
-      throw error;
-    } finally {
-      connection.release();
-    }
-  }
-  async updatePassword(id: number, motDePasseActuel: string, nouveauMotDePasse: string) {
-    if (!motDePasseActuel || nouveauMotDePasse.length < 8) {
-      throw new BadRequestException('Le nouveau mot de passe doit contenir au moins 8 caractères.');
-    }
-
-    const users = await this.db.query<{ password: string }[]>(
-      'SELECT password FROM utilisateurs WHERE id_user = ?',
-      [id],
-    );
-    const user = users[0];
-
-    if (!user || !(await bcrypt.compare(motDePasseActuel, user.password))) {
-      throw new UnauthorizedException('Le mot de passe actuel est incorrect.');
-    }
-
-    const password = await bcrypt.hash(nouveauMotDePasse, 10);
-    await this.db.query('UPDATE utilisateurs SET password = ? WHERE id_user = ?', [password, id]);
-    return { message: 'Mot de passe mis à jour avec succès.' };
-  }
-  async updateLogoUrl(id: number, logoUrl: string | null) {
-    await this.db.query(
-      'UPDATE utilisateurs SET logo_url = ? WHERE id_user = ?',
-      [logoUrl, id],
-    );
+    await this.prisma.$transaction(async (tx) => {
+      await tx.utilisateurs.update({ where: { id_user: id }, data: { prenom: prenom ?? undefined, nom: nom ?? undefined, email: email ?? undefined, tele: tele ?? undefined } });
+      const existingAddress = await tx.adresses.findFirst({ where: { id_user: id }, select: { id_adresse: true } });
+      const addressData = { ligne1: adresse ?? '', ville: ville ?? '', code_postal: code_postal ?? '' };
+      if (existingAddress) await tx.adresses.update({ where: { id_adresse: existingAddress.id_adresse }, data: addressData });
+      else await tx.adresses.create({ data: { id_user: id, ...addressData } });
+    });
     return this.par(id);
   }
+
+  async updatePassword(id: number, motDePasseActuel: string, nouveauMotDePasse: string) {
+    if (!motDePasseActuel || nouveauMotDePasse.length < 8) throw new BadRequestException('Le nouveau mot de passe doit contenir au moins 8 caractères.');
+    const user = await this.prisma.utilisateurs.findUnique({ where: { id_user: id }, select: { password: true } });
+    if (!user || !(await bcrypt.compare(motDePasseActuel, user.password))) throw new UnauthorizedException('Le mot de passe actuel est incorrect.');
+    await this.prisma.utilisateurs.update({ where: { id_user: id }, data: { password: await bcrypt.hash(nouveauMotDePasse, 10) } });
+    return { message: 'Mot de passe mis à jour avec succès.' };
+  }
+
+  async updateLogoUrl(id: number, logoUrl: string | null) {
+    await this.prisma.utilisateurs.update({ where: { id_user: id }, data: { logo_url: logoUrl } });
+    return this.par(id);
+  }
+
   async updateRoleByAdmin(id: number, role: string) {
     const normalizedRole = role?.toLowerCase() === 'admin' ? 'admin' : 'user';
-    const result: any = await this.db.query(
-      'UPDATE utilisateurs SET role = ? WHERE id_user = ?',
-      [normalizedRole, id],
-    );
-    return { success: result?.affectedRows > 0, role: normalizedRole };
+    const result = await this.prisma.utilisateurs.updateMany({ where: { id_user: id }, data: { role: normalizedRole } });
+    return { success: result.count > 0, role: normalizedRole };
   }
 
   async updateStatutByAdmin(id: number, statut: string) {
     const normalizedStatut = statut === 'suspendu' ? 'suspendu' : 'actif';
-    const result: any = await this.db.query(
-      'UPDATE utilisateurs SET statut = ? WHERE id_user = ?',
-      [normalizedStatut, id],
-    );
-    return { success: result?.affectedRows > 0, statut: normalizedStatut };
+    const result = await this.prisma.utilisateurs.updateMany({ where: { id_user: id }, data: { statut: normalizedStatut } });
+    return { success: result.count > 0, statut: normalizedStatut };
   }
 
-  update(id: number, dto: Partial<CreateUtilisateurDto>) {
-    // TODO: this.prisma.utilisateurs.update({ where: { id }, data: dto })
-    return { id, ...dto };
+  async update(id: number, dto: Partial<CreateUtilisateurDto>) {
+    const { prenom, nom, email, tele, role, statut } = dto;
+    return this.prisma.utilisateurs.update({
+      where: { id_user: id },
+      data: {
+        prenom: prenom ?? undefined,
+        nom: nom ?? undefined,
+        email: email ?? undefined,
+        tele: tele ?? undefined,
+        role: role ? (role === 'admin' ? 'admin' : 'user') : undefined,
+        statut: statut ? (statut === 'suspendu' ? 'suspendu' : 'actif') : undefined,
+      },
+    });
   }
 
   remove(id: number) {
-    // TODO: this.prisma.utilisateurs.delete({ where: { id } })
-    return { id };
+    return this.prisma.utilisateurs.delete({ where: { id_user: id } });
   }
 }

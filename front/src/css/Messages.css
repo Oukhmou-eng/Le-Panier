@@ -83,6 +83,16 @@
 .msgr-bubble.them .msgr-bubble-meta{ justify-content:flex-start; }
 
 .msgr-bubble-text{ white-space:pre-wrap; word-break:break-word; }
+.msgr-product-link{
+  display:flex; align-items:center; gap:9px; width:100%; margin-top:8px; padding:7px; border:1px solid currentColor;
+  border-radius:10px; background:rgba(255,255,255,.12); color:inherit; font:inherit; text-align:left; cursor:pointer;
+}
+.msgr-bubble.them .msgr-product-link{ background:var(--bg); }
+.msgr-product-link:hover{ opacity:.85; }
+.msgr-product-link img{ width:40px; height:40px; border-radius:7px; object-fit:cover; background:var(--line); }
+.msgr-product-link span{ display:flex; min-width:0; flex-direction:column; }
+.msgr-product-link small, .msgr-product-link em{ font-size:10px; font-style:normal; opacity:.75; }
+.msgr-product-link strong{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; }
 .msgr-bubble-meta{ display:flex; align-items:center; justify-content:flex-end; gap:5px; margin-top:4px; }
 .msgr-bubble-time{ font-size:9.5px; opacity:.7; }
 .msgr-bubble-status{ font-size:10px; opacity:.85; }

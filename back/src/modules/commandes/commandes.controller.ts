@@ -34,7 +34,7 @@ export class CommandesController {
 
   // Les routes statiques doivent être déclarées avant :userId, sinon « me »
   // est interprété comme un identifiant utilisateur.
-  @Get('utilisateur/:userId')
+  @Get('utilisateur/id/:userId')
   findByUser(@Param('userId') userId: string) {
     return this.commandesService.findByUser(+userId);
   }

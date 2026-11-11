@@ -1,11 +1,13 @@
 import '../../css/Messages.css';
 import { io } from 'socket.io-client';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getCurrentContext } from '../../store/authStore';
 
 const API_URL = 'http://localhost:3000';
 
 function MessagesVendeur() {
+  const navigate = useNavigate();
   const { idUser, isBoutique } = useMemo(() => getCurrentContext(), []);
   const [conversations, setConversations] = useState([]);
   const [activeId, setActiveId] = useState(null);
@@ -268,6 +270,16 @@ function MessagesVendeur() {
                               {isMine ? 'Vous' : 'Client'}
                             </div>
                             {msg.contenu && <div className="msgr-bubble-text">{msg.contenu}</div>}
+                            {msg.produit && (
+                              <button type="button" className="msgr-product-link" onClick={() => navigate(`/produit/${msg.produit.id}`)}>
+                                {msg.produit.image_url && <img src={msg.produit.image_url} alt="" />}
+                                <span>
+                                  <small>Produit concerné</small>
+                                  <strong>{msg.produit.nom}</strong>
+                                  <em>{Number(msg.produit.prix).toFixed(2)} MAD</em>
+                                </span>
+                              </button>
+                            )}
                             <div className="msgr-bubble-meta">
                               <time className="msgr-bubble-time" dateTime={msg.date_creation}>{formatTime(msg.date_creation)}</time>
                               {isMine && <span className="msgr-bubble-status">{statusIcon(msg.statut_lecture)}</span>}

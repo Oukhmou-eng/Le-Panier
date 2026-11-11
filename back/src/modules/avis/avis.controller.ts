@@ -30,10 +30,8 @@ export class AvisController {
   
   @UseGuards(JwtAuthGuard)
   @Get(':id')
-  findOne(
-     @CurrentUser() user: { id_user: number } , 
-    ) {
-    return this.avisService.findOne(user.id_user);
+  findOne(@Param('id') id: string) {
+    return this.avisService.findOne(+id);
   }
 
   @Patch(':id')

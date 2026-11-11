@@ -1,36 +1,27 @@
 import { Injectable } from '@nestjs/common';
-import { DatabaseService } from '../../database/database.service';
+import { PrismaService } from '../../database/prisma.service';
 import { CreateNotificationDto } from './dto/create-notification.dto';
 
 @Injectable()
 export class NotificationsService {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async create(dto: CreateNotificationDto) {
-    const result: any = await this.db.query(
-      `INSERT INTO notifications (id_user, type, contenu, lien, lu)
-       VALUES (?, ?, ?, ?, ?)`,
-      [dto.id_user, dto.type, dto.contenu, dto.lien ?? null, dto.lu ? 1 : 0],
-    );
-    return this.findOne(result.insertId);
+    return this.prisma.notifications.create({
+      data: { id_user: dto.id_user, type: dto.type, contenu: dto.contenu, lien: dto.lien ?? null, lu: dto.lu ?? false },
+    });
   }
 
   async findAll() {
-    return this.db.query(
-      `SELECT id_notification, id_user, type, contenu, lien, lu, date_creation
-       FROM notifications ORDER BY date_creation DESC, id_notification DESC`,
-    );
+    return this.prisma.notifications.findMany({ orderBy: [{ date_creation: 'desc' }, { id_notification: 'desc' }] });
   }
 
   async getNotifications(id: number) {
     try {
-      const notifications = await this.db.query(
-        `SELECT id_notification, id_user, type, contenu, lien, lu, date_creation
-         FROM notifications
-         WHERE id_user = ?
-         ORDER BY date_creation DESC, id_notification DESC`,
-        [id],
-      );
+      const notifications = await this.prisma.notifications.findMany({
+        where: { id_user: id },
+        orderBy: [{ date_creation: 'desc' }, { id_notification: 'desc' }],
+      });
 
       return { notifications: notifications ?? [] };
     } catch (error) {
@@ -40,57 +31,27 @@ export class NotificationsService {
   }
 
   async findOne(id: number) {
-    const rows: any[] = await this.db.query(
-      `SELECT id_notification, id_user, type, contenu, lien, lu, date_creation
-       FROM notifications WHERE id_notification = ? LIMIT 1`,
-      [id],
-    );
-    return rows[0] ?? null;
+    return this.prisma.notifications.findUnique({ where: { id_notification: id } });
   }
 
   async update(id: number, dto: Partial<CreateNotificationDto>) {
-    const fields: string[] = [];
-    const values: unknown[] = [];
-    const allowedFields = ['type', 'contenu', 'lien', 'lu'] as const;
-
-    for (const field of allowedFields) {
-      if (dto[field] !== undefined) {
-        fields.push(`${field} = ?`);
-        values.push(field === 'lu' ? Number(dto[field]) : dto[field]);
-      }
-    }
-
-    if (!fields.length) return this.findOne(id);
-    await this.db.query(
-      `UPDATE notifications SET ${fields.join(', ')} WHERE id_notification = ?`,
-      [...values, id],
-    );
-    return this.findOne(id);
+    const data = Object.fromEntries(Object.entries(dto).filter(([, value]) => value !== undefined));
+    if (!Object.keys(data).length) return this.findOne(id);
+    return this.prisma.notifications.update({ where: { id_notification: id }, data });
   }
 
   async markAllAsRead(userId: number) {
-    const result: any = await this.db.query(
-      `UPDATE notifications SET lu = 1 WHERE id_user = ? AND lu = 0`,
-      [userId],
-    );
-    return { success: true, updated: result.affectedRows ?? 0 };
+    const result = await this.prisma.notifications.updateMany({ where: { id_user: userId, lu: false }, data: { lu: true } });
+    return { success: true, updated: result.count };
   }
 
   async markAsRead(userId: number, notificationId: number) {
-    const result: any = await this.db.query(
-      `UPDATE notifications
-       SET lu = 1
-       WHERE id_notification = ? AND id_user = ?`,
-      [notificationId, userId],
-    );
-    return { success: result.affectedRows > 0 };
+    const result = await this.prisma.notifications.updateMany({ where: { id_notification: notificationId, id_user: userId }, data: { lu: true } });
+    return { success: result.count > 0 };
   }
 
   async remove(id: number) {
-    const result: any = await this.db.query(
-      `DELETE FROM notifications WHERE id_notification = ?`,
-      [id],
-    );
-    return { success: result.affectedRows > 0 };
+    const result = await this.prisma.notifications.deleteMany({ where: { id_notification: id } });
+    return { success: result.count > 0 };
   }
 }

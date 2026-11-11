@@ -493,6 +493,21 @@ function Messagerie() {
                               </div>
                             )}
 
+                            {msg.produit && (
+                              <button
+                                type="button"
+                                className="msgr-product-link"
+                                onClick={() => navigate(`/produit/${msg.produit.id}`)}
+                              >
+                                {msg.produit.image_url && <img src={msg.produit.image_url} alt="" />}
+                                <span>
+                                  <small>Produit concerné</small>
+                                  <strong>{msg.produit.nom}</strong>
+                                  <em>{Number(msg.produit.prix).toFixed(2)} MAD</em>
+                                </span>
+                              </button>
+                            )}
+
                             <div className="msgr-bubble-meta">
                               <time
                                 className="msgr-bubble-time"

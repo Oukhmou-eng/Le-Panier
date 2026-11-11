@@ -1,194 +1,231 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Accueil | Le Panier Marketplace</title>
-  <link rel="stylesheet" href="css/styles.css">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<meta charset="UTF-8">
+<style>
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f8fafc;
+    padding: 30px;
+    color: #1b2238;
+  }
+  .gantt-container {
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+    padding: 25px;
+    max-width: 1000px;
+    margin: 0 auto;
+    border-top: 5px solid #31d5a5;
+  }
+  .title {
+    font-size: 24px;
+    font-weight: bold;
+    color: #1b2238;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #31d5a5;
+    padding-bottom: 10px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+  }
+  th, td {
+    padding: 10px;
+    text-align: left;
+    font-size: 13px;
+  }
+  th {
+    background-color: #f1f5f9;
+    color: #1b2238;
+    font-weight: 700;
+  }
+  .month-header {
+    text-align: center;
+    background-color: #1b2238;
+    color: white;
+    font-weight: bold;
+    border-radius: 4px;
+  }
+  .week-header {
+    text-align: center;
+    background: #e2e8f0;
+    font-size: 11px;
+    font-weight: bold;
+  }
+  .category-row {
+    background-color: #f8fafc;
+    font-weight: bold;
+    color: #1b2238;
+    border-bottom: 1px solid #cbd5e1;
+  }
+  .task-name {
+    padding-left: 20px;
+    color: #334155;
+    font-weight: 500;
+  }
+  /* Gantt Bars */
+  .bar-container {
+    position: relative;
+    height: 100%;
+  }
+  .bar {
+    height: 22px;
+    border-radius: 6px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 11px;
+    font-weight: bold;
+  }
+  .bar-conception { background: linear-gradient(90deg, #4f46e5, #6366f1); }
+  .bar-dev { background: linear-gradient(90deg, #06b6d4, #3b82f6); }
+  .bar-validation { background: linear-gradient(90deg, #f97316, #ef4444); }
+  
+  .timeline-cell {
+    border-left: 1px dashed #e2e8f0;
+    padding: 4px 2px;
+  }
+</style>
 </head>
 <body>
 
-  <!-- HEADER PUBLICLAYOUT (VERT ÉMERAUDE & BLANC) -->
-  <header class="site-header">
-    <div class="container">
-      <div class="header-top">
-        <a href="index.html" class="brand-logo">
-          <span class="brand-dot"></span>
-          Le Panier
-        </a>
+<div class="gantt-container">
+  <div class="title">Planning du Projet – Diagramme de Gantt (Juil. - Août 2026)</div>
+  
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 25%;">Tâche</th>
+        <th style="width: 10%;">Début</th>
+        <th style="width: 10%;">Fin</th>
+        <th style="width: 8%;">Durée</th>
+        <th colspan="4" class="month-header" style="background:#1b2238;">Juillet 2026</th>
+        <th colspan="4" class="month-header" style="background:#0f172a;">Août 2026</th>
+      </tr>
+      <tr>
+        <th colspan="4"></th>
+        <td class="week-header">S28</td>
+        <td class="week-header">S29</td>
+        <td class="week-header">S30</td>
+        <td class="week-header">S31</td>
+        <td class="week-header">S32</td>
+        <td class="week-header">S33</td>
+        <td class="week-header">S34</td>
+        <td class="week-header">S35</td>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- Conception -->
+      <tr class="category-row">
+        <td colspan="12">1. Conception & Cadrage</td>
+      </tr>
+      <tr>
+        <td class="task-name">Étude du besoin & Conception UML</td>
+        <td>01/07</td>
+        <td>07/07</td>
+        <td>7 jours</td>
+        <td class="timeline-cell"><div class="bar bar-conception">7j</div></td>
+        <td class="timeline-cell"></td>
+        <td class="timeline-cell"></td>
+        <td class="timeline-cell"></td>
+        <td class="timeline-cell"></td>
+        <td class="timeline-cell"></td>
+        <td class="timeline-cell"></td>
+        <td class="timeline-cell"></td>
+      </tr>
 
-        <div class="search-bar-wrap">
-          <span class="search-icon-btn">
-            <svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-          </span>
-          <input type="text" class="search-input" placeholder="Rechercher un produit, une marque, une boutique...">
-        </div>
+      <!-- Développement -->
+      <tr class="category-row">
+        <td colspan="12">2. Développement & Implémentation</td>
+      </tr>
+      <tr>
+        <td class="task-name">Architecture technique & Auth</td>
+        <td>01/07</td>
+        <td>14/07</td>
+        <td>14 jours</td>
+        <td class="timeline-cell" colspan="2"><div class="bar bar-dev">14j</div></td>
+        <td class="timeline-cell"></td>
+        <td class="timeline-cell"></td>
+        <td class="timeline-cell"></td>
+        <td class="timeline-cell"></td>
+        <td class="timeline-cell"></td>
+        <td class="timeline-cell"></td>
+      </tr>
+      <tr>
+        <td class="task-name">Catalogue, Boutiques & Produits</td>
+        <td>15/07</td>
+        <td>02/08</td>
+        <td>19 jours</td>
+        <td class="timeline-cell"></td>
+        <td class="timeline-cell" colspan="3"><div class="bar bar-dev">19j</div></td>
+        <td class="timeline-cell"></td>
+        <td class="timeline-cell"></td>
+        <td class="timeline-cell"></td>
+        <td class="timeline-cell"></td>
+      </tr>
+      <tr>
+        <td class="task-name">Panier & Commandes</td>
+        <td>28/07</td>
+        <td>08/08</td>
+        <td>12 jours</td>
+        <td class="timeline-cell"></td>
+        <td class="timeline-cell"></td>
+        <td class="timeline-cell" colspan="2"><div class="bar bar-dev">12j</div></td>
+        <td class="timeline-cell"></td>
+        <td class="timeline-cell"></td>
+        <td class="timeline-cell"></td>
+        <td class="timeline-cell"></td>
+      </tr>
+      <tr>
+        <td class="task-name">Messagerie & Notifications</td>
+        <td>05/08</td>
+        <td>16/08</td>
+        <td>12 jours</td>
+        <td class="timeline-cell"></td>
+        <td class="timeline-cell"></td>
+        <td class="timeline-cell"></td>
+        <td class="timeline-cell" colspan="2"><div class="bar bar-dev">12j</div></td>
+        <td class="timeline-cell"></td>
+        <td class="timeline-cell"></td>
+        <td class="timeline-cell"></td>
+      </tr>
+      <tr>
+        <td class="task-name">Moteur de promotion & Admin</td>
+        <td>12/08</td>
+        <td>23/08</td>
+        <td>12 jours</td>
+        <td class="timeline-cell"></td>
+        <td class="timeline-cell"></td>
+        <td class="timeline-cell"></td>
+        <td class="timeline-cell"></td>
+        <td class="timeline-cell" colspan="2"><div class="bar bar-dev">12j</div></td>
+        <td class="timeline-cell"></td>
+        <td class="timeline-cell"></td>
+      </tr>
 
-        <div class="header-actions">
-          <!-- Icône Boutique Discrète (Exigence #4) -->
-          <a href="vendeur-dashboard.html" class="header-shop-quick-access" title="Accéder à ma boutique">
-            <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
-            <span>Ma Boutique</span>
-          </a>
-
-          <a href="favoris.html" class="nav-icon-link" title="Mes Favoris">
-            <svg class="icon icon-lg" viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
-            <span class="nav-badge">3</span>
-          </a>
-
-          <a href="panier.html" class="nav-icon-link" title="Mon Panier">
-            <svg class="icon icon-lg" viewBox="0 0 24 24"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
-            <span class="nav-badge">2</span>
-          </a>
-
-          <!-- Menu Déroulant Profil Utilisateur (Exigence #3 : Remplace CompteLayout) -->
-          <div class="user-profile-menu">
-            <button class="user-profile-btn">
-              <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80" alt="Avatar Sophie" class="user-avatar">
-              <span class="user-name">Sophie M.</span>
-              <svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"></polyline></svg>
-            </button>
-
-            <div class="user-dropdown-card">
-              <div class="dropdown-user-info">
-                <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80" alt="Avatar Sophie" class="dropdown-avatar-lg">
-                <div class="dropdown-user-details">
-                  <h4>Sophie Martin</h4>
-                  <p>sophie.martin@example.com</p>
-                </div>
-              </div>
-              <div class="dropdown-nav-list">
-                <a href="commandes.html" class="dropdown-nav-item">
-                  <svg class="icon" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-                  <span>Mon Profil & Commandes</span>
-                </a>
-                <a href="parametres.html" class="dropdown-nav-item">
-                  <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-                  <span>Paramètres du compte</span>
-                </a>
-                <a href="vendeur-dashboard.html" class="dropdown-nav-item">
-                  <svg class="icon" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
-                  <span>Gérer ma boutique</span>
-                </a>
-                <div style="height: 1px; background-color: var(--border-color); margin: 4px 0;"></div>
-                <a href="login.html" class="dropdown-nav-item danger">
-                  <svg class="icon" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
-                  <span>Se déconnecter</span>
-                </a>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Navigation Secondaire -->
-    <div class="header-bottom-nav">
-      <div class="container">
-        <div class="nav-links-wrap">
-          <a href="index.html" class="nav-link-item active">Accueil</a>
-          <a href="catalogue.html" class="nav-link-item">Catalogue</a>
-          <a href="soldes.html" class="nav-link-item">Soldes & Promos</a>
-          <a href="boutiques.html" class="nav-link-item">Boutiques</a>
-          <a href="commandes.html" class="nav-link-item">Mes Commandes</a>
-          <a href="favoris.html" class="nav-link-item">Favoris</a>
-          <a href="support.html" class="nav-link-item">Aide & Support</a>
-        </div>
-      </div>
-    </div>
-  </header>
-
-  <!-- CONTENU DE L'ACCUEIL (Home.jsx) -->
-  <main style="flex: 1; padding: 48px 0;">
-    <div class="container">
-      
-      <!-- Hero Banner Vert Émeraude -->
-      <div style="background: linear-gradient(135deg, var(--primary), var(--primary-hover)); border-radius: var(--radius-lg); padding: 48px; color: white; margin-bottom: 48px; display: flex; flex-direction: column; gap: 16px; align-items: flex-start; box-shadow: var(--shadow-lg);">
-        <span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: var(--radius-full); font-size: 13px; font-weight: 600;">Maquettes UI / UX Réimaginées</span>
-        <h1 style="font-size: 38px; font-weight: 800; letter-spacing: -1px; line-height: 1.2;">Bienvenue sur Le Panier Marketplace</h1>
-        <p style="font-size: 16px; opacity: 0.9; max-width: 600px;">
-          Retrouvez toutes les vues de votre application React converties en maquettes HTML + CSS aux couleurs officielle Vert & Blanc.
-        </p>
-        <div style="display: flex; gap: 16px; margin-top: 12px;">
-          <a href="catalogue.html" class="btn-primary-action" style="background: white; color: var(--primary);">Parcourir le Catalogue</a>
-          <a href="boutiques.html" class="btn-secondary-action" style="border-color: white; color: white; background: transparent;">Voir les Boutiques</a>
-        </div>
-      </div>
-
-      <!-- Section Produits Vedette (Home.jsx) -->
-      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px;">
-        <h2 style="font-size: 24px; font-weight: 700; color: var(--text-main);">Produits en vedette</h2>
-        <a href="catalogue.html" style="font-size: 14px; font-weight: 600; color: var(--primary);">Voir tout le catalogue &rarr;</a>
-      </div>
-
-      <div class="products-grid">
-        <div class="product-card">
-          <div class="product-thumb-wrap">
-            <span class="product-badge">Vedette</span>
-            <button class="product-fav-btn active" title="Retirer des favoris">
-              <svg class="icon" viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
-            </button>
-            <img src="https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=600&auto=format&fit=crop&q=80" alt="T-Shirt Coton Bio" class="product-img">
-          </div>
-          <div class="product-card-body">
-            <span class="product-shop-name">Atelier Casablanca</span>
-            <h3 class="product-title">T-Shirt Premium en Coton Biologique</h3>
-            <div class="product-card-footer">
-              <div class="product-price">250 <span class="product-price-currency">MAD</span></div>
-              <a href="produit.html" class="btn-view-product">Découvrir</a>
-            </div>
-          </div>
-        </div>
-
-        <div class="product-card">
-          <div class="product-thumb-wrap">
-            <button class="product-fav-btn" title="Ajouter aux favoris">
-              <svg class="icon" viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
-            </button>
-            <img src="https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600&auto=format&fit=crop&q=80" alt="Baskets Running" class="product-img">
-          </div>
-          <div class="product-card-body">
-            <span class="product-shop-name">Urban Sneakers</span>
-            <h3 class="product-title">Baskets de Running Édition Limité</h3>
-            <div class="product-card-footer">
-              <div class="product-price">690 <span class="product-price-currency">MAD</span></div>
-              <a href="produit.html" class="btn-view-product">Découvrir</a>
-            </div>
-          </div>
-        </div>
-
-        <div class="product-card">
-          <div class="product-thumb-wrap">
-            <span class="product-badge" style="background: #ef4444;">-20%</span>
-            <button class="product-fav-btn" title="Ajouter aux favoris">
-              <svg class="icon" viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
-            </button>
-            <img src="https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600&auto=format&fit=crop&q=80" alt="Casque Audio" class="product-img">
-          </div>
-          <div class="product-card-body">
-            <span class="product-shop-name">Tech & Sound</span>
-            <h3 class="product-title">Casque Audio Bluetooth Réduction de Bruit</h3>
-            <div class="product-card-footer">
-              <div class="product-price">450 <span class="product-price-currency">MAD</span></div>
-              <a href="produit.html" class="btn-view-product">Découvrir</a>
-            </div>
-          </div>
-        </div>
-      </div>
-
-    </div>
-  </main>
-
-  <footer class="site-footer">
-    <div class="container">
-      <div class="footer-content">
-        <p>&copy; 2026 Le Panier Marketplace. Maquettes HTML / CSS aux couleurs officielle Vert & Blanc.</p>
-      </div>
-    </div>
-  </footer>
+      <!-- Validation -->
+      <tr class="category-row">
+        <td colspan="12">3. Validation & Recette</td>
+      </tr>
+      <tr>
+        <td class="task-name">Tests, corrections & Rapport</td>
+        <td>19/08</td>
+        <td>31/08</td>
+        <td>13 jours</td>
+        <td class="timeline-cell"></td>
+        <td class="timeline-cell"></td>
+        <td class="timeline-cell"></td>
+        <td class="timeline-cell"></td>
+        <td class="timeline-cell"></td>
+        <td class="timeline-cell" colspan="3"><div class="bar bar-validation">13j</div></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
 
 </body>
 </html>

@@ -27,6 +27,8 @@ const SORT_OPTIONS = [
   { id: "nouveautes", label: "Nouveautés" },
 ];
 
+const INITIAL_CATEGORY_COUNT = 6;
+
 /**
  * Adapte la forme des données reçues de /categories au format
  * attendu par le composant ({ id, label }).
@@ -70,6 +72,7 @@ function Catalogue() {
 
   /* ---------- Catégories dynamiques (backend) ---------- */
   const [categories, setCategories] = useState([]);
+  const [showAllCategories, setShowAllCategories] = useState(false);
 
   /* =========================================================
      Appels API
@@ -248,6 +251,22 @@ function Catalogue() {
     navigate(`/produit/${productId}`);
   };
 
+  const handleVideoEnter = (event) => {
+    const video = event.currentTarget.querySelector("video");
+    if (video) {
+      video.currentTime = 0;
+      video.play().catch(() => {});
+    }
+  };
+
+  const handleVideoLeave = (event) => {
+    const video = event.currentTarget.querySelector("video");
+    if (video) {
+      video.pause();
+      video.currentTime = 0;
+    }
+  };
+
   const handlePageChange = (page) => {
     if (page < 1 || page > totalPages) return;
     setCurrentPage(page);
@@ -304,6 +323,11 @@ if (!token) {
      Rendu
      ========================================================= */
 
+  const visibleCategories = showAllCategories
+    ? categories
+    : categories.slice(0, INITIAL_CATEGORY_COUNT);
+  const hasHiddenCategories = categories.length > INITIAL_CATEGORY_COUNT;
+
   return (
     <main className="main" id="visitorMain">
       <section className="view active" id="catalogue">
@@ -328,7 +352,8 @@ if (!token) {
 
             <div className="filter-block">
               <h3>Catégorie</h3>
-              {categories.map((cat) => (
+              <div className="category-filter-list">
+              {visibleCategories.map((cat) => (
                 <label key={cat.id}>
                   <input
                     type="checkbox"
@@ -344,6 +369,19 @@ if (!token) {
                   {cat.label}
                 </label>
               ))}
+              </div>
+              {hasHiddenCategories && (
+                <button
+                  type="button"
+                  className="category-filter-toggle"
+                  onClick={() => setShowAllCategories((current) => !current)}
+                  aria-expanded={showAllCategories}
+                >
+                  {showAllCategories
+                    ? "Réduire la liste"
+                    : `Voir les ${categories.length - INITIAL_CATEGORY_COUNT} autres catégories`}
+                </button>
+              )}
             </div>
 
             <div className="filter-block">
@@ -464,16 +502,19 @@ if (!token) {
                 {produits.map((product) => {
                   const estFavori = favoris.has(product.id);
                   const estEnSolde = product.pricePromo !== null && product.pricePromo < product.price;
+                  const estVideo = product.mediaType?.toLowerCase() === "video";
                   return (
                   <div
                     className="card"
                     key={product.id}
                     onClick={() => handleProductClick(product.id)}
+                    onMouseEnter={handleVideoEnter}
+                    onMouseLeave={handleVideoLeave}
                   >
                     <div
                       className="thumb"
                       style={
-                        product.mediaUrl
+                        product.mediaUrl && !estVideo
                           ? {
                               backgroundImage: `url(${product.mediaUrl})`,
                               backgroundSize: "cover",
@@ -485,7 +526,19 @@ if (!token) {
                       {estEnSolde && product.discountPercent > 0 && (
                         <span className="solde-badge">-{product.discountPercent}%</span>
                       )}
-                      <span className="play">▶</span>
+                      {estVideo && product.mediaUrl ? (
+                        <video
+                          src={product.mediaUrl}
+                          muted
+                          loop
+                          playsInline
+                          preload="metadata"
+                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                        />
+                      ) : null}
+                      {estVideo && product.mediaUrl && (
+                        <span className="play" aria-label="Ce produit contient une vidéo">▶</span>
+                      )}
                     </div>
                     <div className="card-body">
                       <button

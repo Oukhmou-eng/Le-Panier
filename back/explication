@@ -1,0 +1,524 @@
+# Moteur de classement des produits promus
+
+## Objectif
+
+Le catalogue doit mettre en avant les produits ayant une promotion réellement active, sans modifier le schéma MySQL existant et sans changer les données renvoyées au frontend.
+
+Un produit promu actif est toujours affiché avant un produit non promu. L'ordre n'est cependant pas fixe : les produits promus à forte priorité ont davantage de chances d'apparaître en premier, sans empêcher un produit de priorité faible d'être parfois premier.
+
+## Fichier principal ajouté
+
+Le nouveau service est :
+
+`src/modules/produits/produits-ranking.service.ts`
+
+Sa méthode principale est :
+
+`getProduitsOrdonnes(filtres, page, limite, include, cacheKey)`
+
+Elle reçoit les filtres Prisma déjà nécessaires à la page (statut, boutique, catégorie, recherche, prix, etc.). Ainsi, seuls les produits correspondant au contexte demandé sont récupérés avant le mélange : la table complète `produits` n'est jamais chargée sans filtre.
+
+## Détection d'une promotion active
+
+La requête Prisma joint uniquement les lignes `promouvoir` qui respectent simultanément les trois conditions suivantes :
+
+```ts
+statut: 'active'
+date_debut <= maintenant
+date_fin >= maintenant
+```
+
+La vérification des dates est indispensable : une promotion ayant encore le statut `active` mais une `date_fin` dépassée n'est pas considérée comme active.
+
+Lorsqu'un produit a plusieurs promotions actives, elles sont récupérées dans l'ordre `priorite DESC`. La première est donc sa priorité maximale (`MAX(priorite)`), qui est celle utilisée pour son poids.
+
+## Principe de l'ordre aléatoire
+
+Après la requête, les produits sont séparés en deux groupes :
+
+1. Produits promus actifs (`promouvoir.length > 0`)
+2. Produits non promus ou avec promotion expirée
+
+### Produits promus : roulette pondérée sans remise
+
+Le poids d'un produit promu est :
+
+```text
+poids = priorité maximale + 1
+```
+
+Le `+ 1` permet à une promotion de priorité `0` de garder une chance d'être tirée.
+
+Pour chaque position dans la liste des promus :
+
+1. Le service additionne les poids des produits restants.
+2. Il tire un nombre aléatoire entre `0` et cette somme.
+3. Il parcourt les produits en cumulant leurs poids jusqu'à atteindre le tirage.
+4. Le produit sélectionné est ajouté au résultat et retiré des produits restants.
+5. Le processus recommence jusqu'à ce que chaque produit soit sélectionné une seule fois.
+
+Ce mécanisme est une roulette pondérée sans remise. Une priorité plus élevée donne statistiquement plus de premières positions, mais ne crée pas un `ORDER BY priorite DESC` figé.
+
+### Produits non promus : Fisher-Yates
+
+Les produits non promus sont mélangés avec l'algorithme Fisher-Yates. Tous ont donc la même probabilité d'occuper chaque position du groupe non promu.
+
+L'ordre final est toujours :
+
+```text
+[produits promus mélangés avec poids] + [produits non promus mélangés]
+```
+
+Les informations internes de classement (`promouvoir`) sont retirées avant de construire la réponse afin de ne pas modifier le contrat des API existantes.
+
+## Pagination
+
+La stratégie choisie est le cache backend court (option b).
+
+- La première page génère un nouvel ordre aléatoire complet.
+- Les identifiants ordonnés sont conservés en mémoire pendant 3 minutes.
+- Une page suivante utilisant les mêmes filtres réutilise cet ordre ; l'utilisateur ne voit donc pas de doublons ni de produits sautés pendant sa navigation.
+- À un nouveau chargement de première page, un nouvel ordre est généré.
+
+Le cache contient seulement les identifiants ordonnés, pas une copie de la base. Les produits sont toujours relus avec les filtres Prisma avant l'application de la pagination.
+
+## Routes et services raccordés
+
+Le service de classement est exporté par `ProduitsModule`, puis importé dans les modules qui listent des produits publics.
+
+- `GET /produits` : `ProduitsService.findAll()`
+- page d'accueil : `HomeService.getHomeData()`
+- recherche catalogue : `CategoriesService.findSearch()` (`POST /categories/search`)
+- filtre/pagination catalogue : `CategoriesService.filtre()` (`POST /categories/filtre`)
+- page d'une boutique : `BoutiquesService.findOne()` (`POST /boutiques/detail`)
+- produits similaires : `ProduitsService.findSimilarProducts()` (`GET /produits/similaires`)
+
+Les fichiers module modifiés sont :
+
+- `src/modules/produits/produits.module.ts`
+- `src/modules/home/home.module.ts`
+- `src/modules/categories/categories.module.ts`
+- `src/modules/boutiques/boutiques.module.ts`
+
+## Tests ajoutés
+
+Les tests sont dans :
+
+`src/modules/produits/produits-ranking.service.spec.ts`
+
+Ils vérifient :
+
+1. Tous les produits promus sont placés avant les non-promus.
+2. Le mélange Fisher-Yates des produits non promus ne produit pas systématiquement le même ordre.
+3. Sur 1 000 simulations, un produit avec une priorité plus haute est plus souvent tiré en première position qu'un produit de priorité faible.
+4. Une promotion au statut `active` mais déjà expirée n'est pas considérée active.
+
+## Vérification
+
+Les commandes suivantes ont été exécutées avec succès depuis le dossier `back` :
+
+```bash
+npm.cmd run build
+npm.cmd test -- --runInBand
+```
+
+
+
+
+## Contenu proposé pour la présentation
+
+### Slide 1 — Algorithme de mise en avant des produits
+
+**Objectif :** rendre les produits promus plus visibles tout en conservant une présentation dynamique et équitable.
+
+- Les produits dont la promotion est active sont affichés avant les autres produits.
+- Une promotion est considérée comme active uniquement si :
+	- son statut est `active` ;
+	- sa date de début est atteinte ;
+	- sa date de fin n'est pas dépassée.
+- La priorité de la promotion influence la probabilité d'apparaître en première position.
+- L'ordre n'est pas fixe : le catalogue peut varier d'un chargement à l'autre.
+- Les produits non promus restent visibles après les produits promus.
+
+**Message à présenter à l'oral :**
+
+> L'algorithme donne davantage de visibilité aux produits réellement promus, mais il évite de créer un classement totalement figé. Cela permet de respecter la promotion tout en renouvelant l'expérience utilisateur.
+
+### Slide 2 — Fonctionnement technique et bénéfices
+
+**Étapes de l'algorithme :**
+
+1. Récupérer uniquement les produits correspondant aux filtres demandés.
+2. Séparer les produits promus actifs des produits non promus.
+3. Mélanger les produits promus avec une roulette pondérée : plus la priorité est élevée, plus la probabilité d'être sélectionné tôt est importante.
+4. Mélanger les produits non promus avec Fisher-Yates, afin de leur donner des chances équivalentes dans leur groupe.
+5. Conserver l'ordre généré pendant 3 minutes pour assurer une pagination cohérente et éviter les doublons.
+
+**Résultat :**
+
+```text
+Produits promus actifs, classés selon une probabilité pondérée
+															+
+Produits non promus, mélangés de manière équitable
+```
+
+**Bénéfices :**
+
+- meilleure visibilité pour les vendeurs qui promeuvent leurs produits ;
+- découverte régulière de produits différents ;
+- absence de doublons ou de produits sautés pendant la navigation ;
+- aucune modification du schéma de base de données ni du format des réponses API.
+
+**Phrase de conclusion :**
+
+> Le moteur combine donc pertinence commerciale, variété d'affichage et cohérence technique.
+
+## Questions possibles sur mon frontend
+
+### Organisation du frontend
+
+1. Pourquoi avoir choisi React pour le frontend de cette marketplace ?
+2. Comment le frontend est-il organisé entre `pages`, `components`, `layouts`, `services`, `router` et `store` ?
+3. Quel est le rôle de `App.jsx` dans l'application ?
+4. Pourquoi avoir séparé les pages publiques, les pages du compte, les pages vendeur et les pages administrateur ?
+5. Quels composants sont réutilisés dans plusieurs pages ?
+6. Pourquoi avoir créé des layouts différents pour les espaces public, compte, vendeur et administrateur ?
+7. Comment le frontend communique-t-il avec le backend NestJS ?
+8. Pourquoi les appels API sont-ils regroupés dans des fichiers de services ?
+9. Quel est le rôle du fichier `api.js` ?
+10. Pourquoi utiliser Vite pour lancer et construire le frontend ?
+
+### Pages publiques de la marketplace
+
+11. Comment fonctionne la page d'accueil `Home.jsx` ?
+12. Quelles données sont chargées sur la page d'accueil ?
+13. Comment fonctionne la page `Catalogue.jsx` ?
+14. Comment la recherche de produits est-elle transmise au backend ?
+15. Comment les catégories et les tranches de prix sont-elles utilisées dans les filtres ?
+16. Comment le filtre de note minimale est-il appliqué ?
+17. Comment la pagination du catalogue fonctionne-t-elle côté frontend ?
+18. Comment le frontend affiche-t-il les produits promus ?
+19. Comment la page `Produit.jsx` récupère-t-elle l'identifiant du produit ?
+20. Quelles informations sont affichées sur la page détail d'un produit ?
+21. Comment les images ou médias d'un produit sont-ils sélectionnés et affichés ?
+22. Comment les avis sont-ils chargés sur la page produit ?
+23. Comment un utilisateur connecté peut-il ajouter un avis ?
+24. Comment le frontend empêche-t-il un utilisateur non connecté d'ajouter un avis ?
+25. Comment fonctionne la page `Boutique.jsx` ?
+26. Comment les produits d'une boutique sont-ils récupérés et affichés ?
+27. Comment fonctionne la page `Boutiques.jsx` ?
+28. Comment un utilisateur peut-il suivre ou ne plus suivre une boutique ?
+29. Comment fonctionne la page `Soldes.jsx` ?
+30. Pourquoi existe-t-il plusieurs pages ou versions liées au catalogue ?
+
+### Authentification et autorisations
+
+31. Comment fonctionne la page de connexion `Login.jsx` ?
+32. Que se passe-t-il dans le frontend après une connexion réussie ?
+33. Quelles informations sont enregistrées dans `localStorage` après la connexion ?
+34. Comment le token est-il envoyé lors des requêtes protégées ?
+35. Comment fonctionne la page d'inscription `Registre.jsx` ?
+36. Comment le frontend affiche-t-il les erreurs de connexion ou d'inscription ?
+37. Comment fonctionne la déconnexion dans les différents layouts ?
+38. Comment le frontend sait-il si l'utilisateur est connecté ?
+39. Comment les routes administrateur sont-elles protégées dans `App.jsx` ?
+40. Comment les pages compte et vendeur sont-elles protégées ?
+41. Pourquoi la protection des routes frontend ne remplace-t-elle pas la sécurité du backend ?
+42. Comment le rôle de l'utilisateur influence-t-il l'affichage de la navigation ?
+43. Que se passe-t-il si le token enregistré dans `localStorage` est expiré ?
+44. Pourquoi avoir utilisé `localStorage` pour la session ?
+45. Quels risques de sécurité sont liés au stockage du token dans `localStorage` ?
+
+### Hooks utilisés dans mon frontend
+
+46. Dans quelles pages utilise-t-on `useState` ?
+47. Quels états sont gérés avec `useState` dans le catalogue ?
+48. Comment `useState` est-il utilisé pour gérer les formulaires de connexion et d'inscription ?
+49. Dans quelles pages utilise-t-on `useEffect` pour charger les données ?
+50. Quelles sont les dépendances des principaux `useEffect` du projet ?
+51. Comment éviter qu'un `useEffect` déclenche une boucle de requêtes ?
+52. Pourquoi faut-il nettoyer certains `useEffect` ?
+53. Où utilise-t-on `useMemo` dans le frontend ?
+54. Pourquoi `useMemo` est-il utilisé pour certains calculs de listes ou de contexte ?
+55. Où utilise-t-on `useCallback` ?
+56. Dans quel cas `useCallback` évite-t-il un comportement indésirable dans cette application ?
+57. Pourquoi `useRef` est-il utilisé dans les pages de messagerie ?
+58. Pourquoi la connexion Socket.IO n'est-elle pas stockée dans un simple state ?
+59. Quels hooks de React Router sont utilisés dans le projet ?
+60. Comment `useNavigate` est-il utilisé après une action utilisateur ?
+61. Comment `useParams` est-il utilisé dans les pages produit et boutique ?
+62. Comment `useSearchParams` est-il utilisé pour la recherche du catalogue ?
+63. Pourquoi `useContext` ou `useReducer` ne sont-ils pas utilisés actuellement dans ce frontend ?
+
+### Panier, favoris et commandes
+
+64. Comment fonctionne la page `Panier.jsx` ?
+65. Comment les produits sont-ils ajoutés au panier ?
+66. Comment la quantité d'un article est-elle modifiée dans le panier ?
+67. Comment un article peut-il être supprimé du panier ?
+68. Comment fonctionnent les articles sauvegardés du panier ?
+69. Comment le total du panier est-il calculé ?
+70. Comment le frontend gère-t-il un panier vide ?
+71. Comment le frontend affiche-t-il une erreur lors du chargement du panier ?
+72. Pourquoi les opérations du panier sont-elles regroupées dans `panierService.js` ?
+73. Comment fonctionne la page des favoris ?
+74. Comment le frontend vérifie-t-il si un produit est déjà dans les favoris ?
+75. Comment fonctionne la page des commandes du client ?
+76. Comment les différents statuts d'une commande sont-ils affichés ?
+77. Comment l'utilisateur peut-il recommander un produit depuis ses commandes ?
+
+### Espace vendeur
+
+78. Comment fonctionne le layout vendeur ?
+79. Quelles pages sont accessibles au vendeur ?
+80. Comment fonctionne la page `MesProduits.jsx` ?
+81. Comment les produits du vendeur sont-ils filtrés par recherche, catégorie ou statut ?
+82. Comment un vendeur peut-il supprimer un produit ?
+83. Comment fonctionne la page `PublierProduit.jsx` ?
+84. Comment le même formulaire sert-il à créer et modifier un produit ?
+85. Comment les images d'un produit sont-elles envoyées depuis le frontend ?
+86. Pourquoi utiliser `FormData` pour publier un produit ?
+87. Comment les catégories sont-elles chargées dans le formulaire vendeur ?
+88. Comment fonctionne la page de gestion des publicités et promotions ?
+89. Comment un vendeur choisit-il un plan de promotion ?
+90. Comment le frontend affiche-t-il les promotions actives ?
+91. Comment fonctionne la page `ParametresVendeur.jsx` ?
+92. Comment le logo et la bannière de la boutique sont-ils modifiés ?
+93. Comment fonctionne la page des commandes reçues par le vendeur ?
+94. Comment fonctionne la page des avis clients du vendeur ?
+95. Comment fonctionne la page des statistiques vendeur ?
+96. Quelles données sont affichées dans les graphiques vendeur ?
+
+### Espace administrateur
+
+97. Comment fonctionne le layout administrateur ?
+98. Quelles pages sont disponibles dans l'espace administrateur ?
+99. Comment fonctionne le tableau de bord administrateur ?
+100. Comment les utilisateurs sont-ils recherchés et filtrés dans l'administration ?
+101. Comment un administrateur peut-il modifier le statut ou le rôle d'un utilisateur ?
+102. Comment un administrateur peut-il créer un utilisateur ?
+103. Comment les boutiques sont-elles gérées dans l'espace administrateur ?
+104. Comment les catégories sont-elles créées, modifiées ou supprimées ?
+105. Comment les plans tarifaires sont-ils gérés ?
+106. Comment les factures des boutiques sont-elles affichées ?
+107. Pourquoi utiliser `Recharts` dans la page des factures ou des statistiques ?
+108. Comment les signalements sont-ils affichés et traités ?
+109. Comment fonctionne le composant `ReportModal` ?
+110. Comment le frontend empêche-t-il les actions administrateur pendant l'enregistrement ?
+
+### Messagerie en temps réel
+
+111. Pourquoi utiliser Socket.IO pour la messagerie ?
+112. Comment la connexion Socket.IO est-elle créée dans `Messages.jsx` ?
+113. Comment la connexion Socket.IO est-elle créée dans `MessagesVendeur.jsx` ?
+114. Comment le frontend rejoint-il une conversation ?
+115. Comment un nouveau message est-il reçu et ajouté à la conversation ?
+116. Pourquoi utiliser `useRef` pour conserver la socket ?
+117. Comment la connexion est-elle fermée lorsque l'utilisateur quitte la page ?
+118. Que se passe-t-il si la connexion Socket.IO échoue ?
+119. Comment éviter de créer plusieurs connexions pour un même utilisateur ?
+120. Comment le frontend distingue-t-il les messages du client et ceux du vendeur ?
+121. Pourquoi charger l'historique des messages par HTTP en plus de Socket.IO ?
+
+### Requêtes, états et erreurs
+
+122. Comment les appels `fetch` sont-ils organisés dans les pages ?
+123. Pourquoi vérifier `response.ok` après un appel `fetch` ?
+124. Comment les états `loading`, `error` et `message` sont-ils utilisés ?
+125. Comment afficher un état de chargement pendant une requête ?
+126. Comment afficher une liste vide lorsque l'API ne renvoie aucun résultat ?
+127. Comment gérer une erreur réseau dans le frontend ?
+128. Comment éviter qu'un utilisateur clique plusieurs fois sur un bouton d'envoi ?
+129. Comment le frontend gère-t-il une réponse API inattendue ?
+130. Comment les données venant de l'API sont-elles transformées avant affichage ?
+131. Pourquoi faut-il vérifier qu'une liste reçue est bien un tableau ?
+132. Comment les erreurs du backend sont-elles présentées à l'utilisateur ?
+133. Comment éviter d'afficher des informations sensibles dans la console du navigateur ?
+
+### Interface et responsive design
+
+134. Comment les fichiers CSS du frontend sont-ils organisés ?
+135. Pourquoi certaines pages possèdent-elles leur propre fichier CSS ?
+136. Comment l'interface s'adapte-t-elle aux écrans mobiles ?
+137. Comment les sidebars vendeur et administrateur sont-elles adaptées au responsive ?
+138. Comment les tableaux de commandes et d'administration sont-ils affichés sur petit écran ?
+139. Comment sont gérées les modales sur mobile ?
+140. Comment l'état actif d'un lien de navigation est-il affiché ?
+141. Comment éviter les problèmes d'affichage lorsque les textes ou les images sont longs ?
+142. Comment les images de produits sont-elles affichées lorsqu'elles sont absentes ?
+143. Comment vérifier que l'interface reste utilisable pendant le chargement ?
+
+### Tests et amélioration de mon frontend
+
+144. Quelles pages principales faut-il tester en priorité ?
+145. Comment tester le parcours connexion, catalogue, produit et panier ?
+146. Comment tester une route protégée avec et sans token ?
+147. Comment tester un formulaire de publication de produit ?
+148. Comment tester le chargement et l'affichage des erreurs API ?
+149. Comment tester la messagerie temps réel ?
+150. Quelles améliorations apporteriez-vous à la gestion centralisée de l'authentification ?
+151. Quelles améliorations apporteriez-vous aux appels API répétés dans les pages ?
+152. Pourquoi pourrait-on créer un client API commun pour tout le frontend ?
+153. Dans quels cas un store global serait-il utile dans cette application ?
+154. Comment améliorer les performances du catalogue lorsque le nombre de produits augmente ?
+155. Comment améliorer la sécurité des informations stockées côté navigateur ?
+156. Quelles vérifications faites-vous avec `npm run lint` et `npm run build` avant la livraison ?
+
+## Réponses résumées
+
+1. React permet de construire une interface dynamique avec des composants réutilisables.
+2. Le frontend est séparé par responsabilité : pages, composants, layouts, services, routes et store.
+3. `App.jsx` contient la configuration principale des routes et des accès.
+4. Cette séparation facilite l'organisation des différents espaces utilisateurs.
+5. Les layouts, sidebars, cartes, modales et composants de formulaire sont réutilisables.
+6. Chaque espace possède sa navigation et sa structure adaptées à son rôle.
+7. Il communique avec NestJS grâce aux requêtes HTTP `fetch`.
+8. Les services évitent de répéter les appels API dans les composants.
+9. `api.js` centralise les paramètres communs des appels API.
+10. Vite fournit un serveur rapide et un build optimisé.
+11. `Home.jsx` charge et affiche les données principales de la marketplace.
+12. Elle charge notamment les produits, catégories et informations mises en avant.
+13. `Catalogue.jsx` affiche les produits avec recherche, filtres et pagination.
+14. La recherche est envoyée au backend avec les paramètres ou le corps de la requête.
+15. Ils servent à filtrer les produits selon la catégorie et le prix.
+16. Le catalogue conserve seulement les produits ayant la note minimale choisie.
+17. Le frontend demande au backend la page correspondant à la pagination sélectionnée.
+18. Ils apparaissent avant les produits ordinaires selon l'ordre fourni par l'API.
+19. `useParams` récupère `id` depuis la route `/produit/:id`.
+20. Elle affiche le produit, ses images, sa description, son prix et ses avis.
+21. Le frontend conserve l'image sélectionnée dans un state et l'affiche dans la zone principale.
+22. Il les récupère avec une requête vers l'API des avis du produit.
+23. Il remplit le formulaire puis envoie l'avis avec le token JWT.
+24. Il vérifie la présence du token et demande la connexion si nécessaire.
+25. Elle charge les informations d'une boutique et ses produits.
+26. Ils sont récupérés par l'API puis stockés dans un state.
+27. Elle charge et présente la liste des boutiques disponibles.
+28. Une action envoie une requête d'ajout ou de suppression du suivi.
+29. Elle affiche les produits bénéficiant de promotions ou de soldes.
+30. Certaines versions correspondent à des essais ou à d'anciennes implémentations du catalogue.
+31. Elle envoie l'email et le mot de passe à l'API d'authentification.
+32. Le token et les informations utilisateur sont enregistrés, puis l'utilisateur est redirigé.
+33. Le token, le nom, l'email, le rôle, l'avatar et parfois l'identifiant de boutique.
+34. Il est envoyé dans `Authorization: Bearer <token>`.
+35. Elle collecte les informations du formulaire et les envoie à l'API d'inscription.
+36. Les erreurs sont stockées puis affichées dans l'interface.
+37. Les données de session sont supprimées et l'utilisateur est redirigé.
+38. Il vérifie la présence du token dans `localStorage`.
+39. `App.jsx` affiche la page ou redirige vers `/login` selon le token.
+40. Elles utilisent le même principe de vérification avant l'accès.
+41. Le backend doit toujours revérifier les droits, car le frontend peut être modifié.
+42. Le rôle détermine les liens et les pages visibles.
+43. Les requêtes protégées échouent et l'utilisateur doit se reconnecter.
+44. Pour conserver la session après un rechargement de page.
+45. Un script XSS pourrait récupérer un token stocké dans le navigateur.
+46. Il est utilisé pour les formulaires, listes, filtres, modales, erreurs et chargements.
+47. Recherche, catégories, prix, note, produits, favoris et état de chargement.
+48. Chaque champ possède une valeur dans le state et est mis à jour avec `onChange`.
+49. Dans presque toutes les pages qui chargent des données depuis l'API.
+50. Elles correspondent aux valeurs nécessaires au rechargement, comme un identifiant ou un filtre.
+51. En définissant correctement les dépendances et en évitant de modifier une dépendance dans l'effet.
+52. Pour fermer les connexions, retirer les écouteurs et éviter les requêtes inutiles.
+53. Il est utilisé notamment pour les données dérivées et certains calculs de listes.
+54. Il évite de refaire un calcul lorsque les données utilisées n'ont pas changé.
+55. Il est utilisé pour stabiliser certaines fonctions employées dans les effets.
+56. Il évite qu'un effet soit relancé inutilement à cause d'une nouvelle référence de fonction.
+57. Il conserve la référence de la connexion Socket.IO entre les rendus.
+58. Une socket est une référence mutable et ne doit pas provoquer de rendu à chaque changement.
+59. `useNavigate`, `useParams`, `useLocation` et `useSearchParams`.
+60. Il redirige après une connexion, une création, une suppression ou une action réussie.
+61. Il récupère l'identifiant dynamique du produit ou de la boutique.
+62. Il récupère le texte de recherche présent dans l'URL.
+63. L'état actuel reste suffisamment local et ne nécessite pas ces hooks.
+64. Elle charge les articles, permet les modifications et affiche le total.
+65. Une requête API ajoute le produit avec sa quantité.
+66. Une action envoie la nouvelle quantité au service du panier.
+67. Le frontend appelle la route de suppression puis actualise la liste.
+68. Ils sont déplacés dans une liste sauvegardée via une action dédiée.
+69. Il additionne le prix de chaque article multiplié par sa quantité.
+70. Il affiche un message indiquant que le panier est vide.
+71. Il affiche le message d'erreur enregistré dans le state.
+72. Le service centralise les opérations d'ajout, lecture, modification et suppression.
+73. Elle récupère les produits favoris et permet de les retirer ou de les consulter.
+74. Il compare l'identifiant du produit avec les identifiants favoris reçus.
+75. Elle charge les commandes de l'utilisateur et affiche leur état.
+76. Chaque statut est transformé en texte ou en style adapté.
+77. Un lien redirige vers la page du produit pour le recommander.
+78. Il fournit la navigation et les informations communes à l'espace vendeur.
+79. Produits, publicités, avis, commandes, statistiques et paramètres boutique.
+80. Elle charge, recherche, filtre et gère les produits du vendeur.
+81. Les critères sont conservés dans le state puis envoyés ou appliqués à la liste.
+82. Il confirme l'action puis appelle l'API de suppression.
+83. Elle sert à créer un produit ou à modifier un produit existant.
+84. La présence d'un paramètre `id` détermine le mode modification.
+85. Les fichiers sont ajoutés à un objet `FormData`.
+86. `FormData` permet d'envoyer des champs et des fichiers dans la même requête.
+87. Une requête récupère les catégories avant l'affichage du formulaire.
+88. Elle affiche les publicités et les plans disponibles pour le vendeur.
+89. Il sélectionne un plan puis envoie la demande de promotion.
+90. Il les récupère depuis l'API puis les affiche dans la page vendeur.
+91. Elle permet de modifier les informations de la boutique.
+92. Les fichiers sont envoyés avec `FormData` vers l'API boutique.
+93. Elle affiche les commandes associées à la boutique du vendeur.
+94. Elle charge les avis et leurs statistiques pour la boutique.
+95. Elle charge les données statistiques et les représente graphiquement.
+96. Les ventes, revenus ou évolutions par période selon les données de l'API.
+97. Il fournit les menus et la structure commune de l'administration.
+98. Tableau de bord, utilisateurs, boutiques, plans, catégories, factures et signalements.
+99. Il récupère les indicateurs principaux et les affiche sous forme de résumé.
+100. Les champs de recherche et filtres modifient les paramètres envoyés à l'API.
+101. Une action appelle l'API avec l'identifiant et la nouvelle valeur.
+102. Il remplit le formulaire puis envoie les données à l'API administrateur.
+103. La liste est chargée puis l'administrateur peut effectuer les actions autorisées.
+104. Les formulaires et boutons appellent les routes de création, modification et suppression.
+105. Les plans sont chargés puis modifiés depuis l'interface dédiée.
+106. Elles sont récupérées par l'API puis présentées dans un tableau ou résumé.
+107. Recharts permet de représenter les données sous forme de graphiques React.
+108. Ils sont listés, consultés et traités par l'administrateur.
+109. `ReportModal` affiche un formulaire pour envoyer un signalement.
+110. Les boutons sont désactivés pendant la requête grâce à un état de sauvegarde.
+111. Socket.IO permet de recevoir les messages immédiatement sans recharger la page.
+112. Elle est créée une fois avec l'URL, le token et le transport WebSocket.
+113. Le principe est identique dans l'espace vendeur.
+114. La socket émet l'événement de rejoindre avec l'identifiant de conversation.
+115. L'écouteur `newMessage` ajoute le message reçu au state.
+116. `useRef` conserve une seule référence mutable à la socket.
+117. Le nettoyage de `useEffect` déconnecte la socket et retire les écouteurs.
+118. L'erreur est journalisée et l'historique HTTP reste utilisable.
+119. On vérifie qu'aucune socket n'existe avant d'en créer une nouvelle.
+120. Les identifiants et les données de l'expéditeur déterminent le style du message.
+121. HTTP charge l'historique, tandis que Socket.IO reçoit les nouveaux messages.
+122. Ils sont exécutés dans les pages ou centralisés dans les services concernés.
+123. `fetch` ne considère pas automatiquement les réponses 400 ou 500 comme des erreurs.
+124. Ils indiquent respectivement l'attente, l'erreur et la réussite d'une action.
+125. Un texte, un spinner ou un bouton désactivé est affiché pendant la requête.
+126. Un message spécifique indique qu'aucun résultat n'est disponible.
+127. Un bloc `try/catch` affiche un message d'erreur adapté.
+128. Le bouton est désactivé pendant l'envoi.
+129. Elle vérifie les propriétés reçues avant de les afficher.
+130. Elles sont filtrées, formatées ou renommées selon le besoin de l'écran.
+131. Cela évite les erreurs lors de l'utilisation de `.map()` ou `.length`.
+132. Les messages sont stockés dans un state puis affichés près de l'action concernée.
+133. Il faut supprimer les logs sensibles et ne jamais afficher le token.
+134. Les styles sont répartis par page, layout et fonctionnalité.
+135. Cela limite les conflits et facilite la maintenance.
+136. Les media queries, grilles et flexbox réorganisent les éléments.
+137. Elles changent de largeur, de position ou de disposition selon l'écran.
+138. Ils sont rendus responsives avec défilement ou réorganisation des colonnes.
+139. Elles utilisent une largeur flexible et s'adaptent à l'écran.
+140. `NavLink` permet d'appliquer une classe lorsque la route est active.
+141. Il faut utiliser des tailles flexibles, des retours à la ligne et des limites d'image.
+142. Une image par défaut ou un état vide est affiché.
+143. Il faut vérifier les états de chargement, d'erreur et de contenu vide.
+144. Connexion, inscription, catalogue, produit, panier et espaces protégés.
+145. Il faut simuler les actions et vérifier les redirections et les données affichées.
+146. Sans token, la redirection doit avoir lieu ; avec token, le contenu doit s'afficher.
+147. Il faut vérifier les champs, les fichiers, l'envoi et le résultat de l'API.
+148. Il faut simuler une réponse lente, vide ou en erreur.
+149. Il faut tester la connexion, l'entrée dans une conversation et la réception d'un message.
+150. Centraliser le token dans un contexte ou un store d'authentification.
+151. Regrouper les appels répétitifs dans des services communs.
+152. Un client commun centraliserait l'URL, le token et la gestion des erreurs.
+153. Il serait utile pour l'authentification, le panier ou les données partagées.
+154. Ajouter pagination, recherche serveur, images optimisées et chargement différé.
+155. Préférer des cookies `HttpOnly` et limiter les données sensibles côté navigateur.
+156. `lint` vérifie le code ; `build` vérifie la compilation et la production.

@@ -141,7 +141,11 @@ checkFollow(
 
   @Post('detail')
   findOne(@Body() body: any) {
-    return this.boutiquesService.findOne(body.id);
+    const boutiqueId = Number(body.id);
+    if (!Number.isInteger(boutiqueId) || boutiqueId <= 0) {
+      throw new BadRequestException('Identifiant de boutique invalide.');
+    }
+    return this.boutiquesService.findOne(boutiqueId);
   }
 
   @UseGuards(JwtAuthGuard)

@@ -1,31 +1,29 @@
-﻿import { Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../../database/prisma.service';
 import { CreateRevenuDto } from './dto/create-revenu.dto';
 
 @Injectable()
 export class RevenusService {
+  constructor(private readonly prisma: PrismaService) {}
 
   create(dto: CreateRevenuDto) {
-    // TODO: this.prisma.revenus.create({ data: dto })
-    return dto;
+    return this.prisma.revenus_vendeur.create({ data: { ...dto, statut: 'en_attente' } });
   }
 
   findAll() {
-    // TODO: this.prisma.revenus.findMany()
-    return [];
+    return this.prisma.revenus_vendeur.findMany({ orderBy: { date: 'desc' } });
   }
 
   findOne(id: number) {
-    // TODO: this.prisma.revenus.findUnique({ where: { id } })
-    return { id };
+    return this.prisma.revenus_vendeur.findUnique({ where: { id_revenu: id } });
   }
 
   update(id: number, dto: Partial<CreateRevenuDto>) {
-    // TODO: this.prisma.revenus.update({ where: { id }, data: dto })
-    return { id, ...dto };
+    return this.prisma.revenus_vendeur.update({ where: { id_revenu: id }, data: dto });
   }
 
-  remove(id: number) {
-    // TODO: this.prisma.revenus.delete({ where: { id } })
+  async remove(id: number) {
+    await this.prisma.revenus_vendeur.delete({ where: { id_revenu: id } });
     return { id };
   }
 }

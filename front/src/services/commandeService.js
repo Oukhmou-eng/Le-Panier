@@ -5,8 +5,8 @@ function getAuthHeader() {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-export async function getCommandesUtilisateur(userId = 1) {
-  const response = await fetch(`${API_URL}/commandes/utilisateur/${userId}`, {
+export async function getCommandesUtilisateur() {
+  const response = await fetch(`${API_URL}/commandes/utilisateur/me`, {
     headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
   });
   const data = await response.json();

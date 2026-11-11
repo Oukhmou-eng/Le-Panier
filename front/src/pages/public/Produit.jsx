@@ -272,6 +272,12 @@ const fetchReviews = async () => {
       return;
     }
 
+    const productId = Number(id);
+    if (!Number.isInteger(productId) || productId <= 0) {
+      setContactError("Impossible de contacter le vendeur : produit introuvable.");
+      return;
+    }
+
     setIsContactingSeller(true);
     setContactError(null);
 
@@ -284,8 +290,9 @@ const fetchReviews = async () => {
         },
         body: JSON.stringify({
           id_boutique: Number(product.shopId),
-          contenu: "Bonjour, je souhaite en savoir plus sur ce produit.",
-          type_message: "texte",
+          id_produit: productId,
+          contenu: `Bonjour, je souhaite en savoir plus sur le produit « ${product.name || "ce produit"} ».`,
+          type_message: "produit",
         }),
       });
 
@@ -343,7 +350,7 @@ const fetchReviews = async () => {
                 <img
                   src={selectedMedia.url}
                   alt={product?.name ?? "Produit"}
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  style={{ width: "100%", height: "100%", objectFit: "contain", objectPosition: "center" }}
                 />
               ) : (
                 <div className="play-big">▶</div>
@@ -434,13 +441,18 @@ const fetchReviews = async () => {
               <button className="btn teal" onClick={handleAddToCart}>
                 Ajouter au panier
               </button>
-              <button className="btn outline" onClick={handleContactSeller}>
-                Contacter le vendeur
+              <button
+                className="btn outline"
+                onClick={handleContactSeller}
+                disabled={isContactingSeller}
+              >
+                {isContactingSeller ? "Ouverture de la conversation…" : "Contacter le vendeur"}
               </button>
               <button className="btn outline" onClick={() => setShowReportModal(true)}>
                 ⚑ Signaler ce produit
               </button>
             </div>
+            {contactError && <p className="fiche-contact-error" role="alert">{contactError}</p>}
             <ReportModal
               isOpen={showReportModal}
               onClose={() => setShowReportModal(false)}
